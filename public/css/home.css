@@ -1,0 +1,236 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Times New Roman', serif;
+    background: #fff;
+}
+
+.header {
+    background-color: #83E8C3;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 10vh;
+    border: 1px solid #aaa;
+}
+
+.logout-btn {
+    color: white;
+    background-color: black;
+    border: none;
+    padding: 0.5rem 1.5rem;
+    margin-right: 1.5rem;
+    font-size: 1.3rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.main-status {
+    background: #000;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+    min-height: 240px;
+}
+
+.status-circle {
+    width: 180px;
+    height: 180px;
+    background: #83E8C3;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #000;
+    margin: 0 auto;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.datetime {
+    text-align: right;
+    font-size: 1.3rem;
+    font-weight: bold;
+    margin-top: 30px;
+    line-height: 1.2;
+}
+
+.detail {
+    color: #fff;
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin-left: 10px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+}
+
+.detail .arrow {
+    font-size: 1.3rem;
+    margin-right: 8px;
+}
+
+.features-title {
+    text-align: center;
+    font-size: 3rem;
+    font-weight: bold;
+    margin: 30px 0 20px 0;
+    letter-spacing: 2px;
+    font-family: 'Times New Roman', serif;
+}
+
+.features-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 32px 40px;
+    margin-bottom: 60px;
+}
+
+.feature-btn {
+    background: #ddd;
+    border: none;
+    border-radius: 4px;
+    font-size: 1.3rem;
+    font-weight: bold;
+    padding: 22px 38px;
+    min-width: 220px;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    transition: background 0.2s;
+    font-family: 'Times New Roman', serif;
+}
+
+.feature-btn:hover {
+    background: #b8e0d2;
+}
+
+.silent-mode {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ddd;
+    border-radius: 4px;
+    min-width: 220px;
+    padding: 22px 38px;
+    font-size: 1.3rem;
+    font-weight: bold;
+    font-family: 'Times New Roman', serif;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+}
+
+.switch {
+    margin-left: 18px;
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 26px;
+}
+
+.switch input { display: none; }
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #bbb;
+    border-radius: 26px;
+    transition: .4s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #fff;
+    border-radius: 50%;
+    transition: .4s;
+}
+
+.switch input:checked + .slider {
+    background-color: #a00;
+}
+
+.switch input:checked + .slider:before {
+    transform: translateX(22px);
+}
+
+.chatbot {
+    position: fixed;
+    bottom: 24px;
+    right: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.chatbot-btn {
+    width: 64px;
+    height: 64px;
+    background: #83E8C3;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    cursor: pointer;
+    border: 2px solid #fff;
+}
+
+.chatbot-btn span {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    margin: 0 2px;
+}
+
+.chatbot-label {
+    color: #83E8C3;
+    font-weight: bold;
+    font-size: 1rem;
+    margin-top: 6px;
+    text-align: center;
+    font-family: 'Times New Roman', serif;
+}
+
+/* Đậm chữ cho các nút */
+.feature-btn, .silent-mode {
+    font-family: 'Times New Roman', serif;
+    font-weight: bold;
+}
+
+/* Xóa viền đen cho nút và silent-mode */
+.feature-btn, .silent-mode {
+    border: none;
+}
+
+/* Responsive cho mobile */
+@media (max-width: 900px) {
+    .features-grid {
+        flex-direction: column;
+        gap: 20px;
+        align-items: center;
+    }
+    .feature-btn, .silent-mode {
+        min-width: 180px;
+        padding: 18px 10px;
+        font-size: 1.1rem;
+    }
+    .main-status {
+        flex-direction: column;
+        gap: 20px;
+        padding: 20px 0;
+    }
+}

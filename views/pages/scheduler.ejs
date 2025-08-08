@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scheduler</title>
+    <link rel="stylesheet" href="/css/scheduler.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="goback-btn">Go Back</button>
+            <button class="logout-btn">Log Out</button>
+        </div>
+        <div class="title">Scheduler</div>
+        <form class="scheduler-form">
+            <div class="section">
+                <div class="section-title">Interval between measurements</div>
+                <div class="row">
+                    <input type="number" class="input-number" value="5" min="1" max="60">
+                    <select class="input-select">
+                        <option value="min">min</option>
+                        <option value="hour">hour</option>
+                    </select>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-title">Measure during specific time range</div>
+                <div class="row label-row">
+                    <div class="label-left">Start</div>
+                </div>
+                <div class="row">
+                    <input type="number" class="input-number" value="5" min="1" max="12">
+                    <select class="input-select">
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                    </select>
+                </div>
+                <div class="row label-row">
+                    <div class="label-left">End</div>
+                </div>
+                <div class="row">
+                    <input type="number" class="input-number" value="5" min="1" max="12">
+                    <select class="input-select">
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                    </select>
+                </div>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
