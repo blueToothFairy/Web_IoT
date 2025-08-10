@@ -31,8 +31,8 @@ uint8_t oledAddress = 0x3C;
 DHT dht(DHTPIN, DHTTYPE);
 
 // -------------------- WIFI + NTP --------------------
-String saved_ssid = "";
-String saved_password = "";
+const char* ssid     = "Trang thu_5G";   // lưu ý: ESP32 chỉ vào 2.4 GHz
+const char* password = "19631965";
 
 const char* ntpServers[] = {
   "vn.pool.ntp.org", "asia.pool.ntp.org", "time.google.com", "pool.ntp.org"

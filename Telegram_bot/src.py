@@ -6,7 +6,7 @@ import aiohttp
 import json
 
 BOT_TOKEN = "8105980539:AAE8fjSNKsqte2icOchMXt1u9RL0qWJb_QU"
-ESP32_BASE = "http://192.168.1.17"
+ESP32_BASE = "http://192.168.1.29"
 HTTP_TIMEOUT = aiohttp.ClientTimeout(total=5)
 
 # Lưu tạm chat_id sau khi /start (in-memory)
