@@ -13,6 +13,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <time.h>
+#include <EEPROM.h>
 
 // -------------------- PINOUT / HARDWARE --------------------
 #define DHTPIN         15
@@ -38,8 +39,8 @@ uint8_t oledAddress = 0x3C;
 DHT dht(DHTPIN, DHTTYPE);
 
 // -------------------- WIFI + NTP --------------------
-const char* ssid     = "Trang thu_5G";   // lưu ý: ESP32 chỉ vào 2.4 GHz
-const char* password = "19631965";
+String saved_ssid = "";
+String saved_password = "";
 
 const char* ntpServers[] = {
   "vn.pool.ntp.org", "asia.pool.ntp.org", "time.google.com", "pool.ntp.org"
@@ -54,8 +55,8 @@ const float HUM_LOW    = 35.0;   // %
 const float HUM_HIGH   = 80.0;   // %
 const int   MQ2_WARN   = 600;    // ADC
 const int   MQ2_DANG   = 1000;   // ADC
-const int   DUST_WARN  = 700;    // ADC
-const int   DUST_DANG  = 1200;   // ADC
+const float   DUST_WARN  = 0.036;    // mg/m3
+const float   DUST_DANG  = 0.056;   // mg/m3
 
 // Hysteresis (khi hạ mức)
 const float TEMP_HYS   = 0.8;    // 80% ngưỡng
@@ -73,8 +74,8 @@ WebServer server(80);
 
 // Lưu giá trị gần nhất cho /status
 enum Level { LV_OK=0, LV_WARN=1, LV_DANG=2 };
-float g_temp = NAN, g_hum = NAN;
-int   g_mq2 = 0, g_dust = 0;
+float g_temp = NAN, g_hum = NAN, g_dust = 0;
+int   g_mq2 = 0;
 int   g_level = 0;  // 0 OK, 1 WARN, 2 DANG
 
 // Nhịp cập nhật
@@ -99,23 +100,6 @@ uint8_t scanI2CAndPickOLED() {
   if (!chosen) { Serial.println("⚠️ Không thấy 0x3C/0x3D, dùng 0x3C mặc định."); chosen = 0x3C; }
   Serial.print("✅ Chọn địa chỉ OLED: 0x"); Serial.println(chosen, HEX);
   return chosen;
-}
-
-void wifiConnect(unsigned long timeout_ms = 20000) {
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.print("Kết nối Wi-Fi ");
-  unsigned long t0 = millis();
-  while (WiFi.status() != WL_CONNECTED && (millis() - t0) < timeout_ms) {
-    delay(500); Serial.print(".");
-  }
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n✅ Wi-Fi OK");
-    Serial.print("IP: "); Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("\n⛔ Không kết nối được Wi-Fi. Kiểm tra SSID/mật khẩu & 2.4GHz.");
-    safeHalt();
-  }
 }
 
 void ensureNTP() {
@@ -148,14 +132,16 @@ String nowString() {
 }
 
 // -------------------- DUST READ --------------------
-int readDustRaw() {
+float readDustDensity() {
   digitalWrite(G3_PIN, LOW);             // LED ON
   delayMicroseconds(280);
   int v = analogRead(G5_PIN);            // ADC1
   delayMicroseconds(40);
   digitalWrite(G3_PIN, HIGH);            // LED OFF
   delayMicroseconds(9680);               // chu kỳ ~10ms
-  return v; // 0..4095
+  
+  float vOut = v * 3.3 / 4095.0;
+  return (0.17 * vOut - 0.1 < 0) ? 0 : (0.17 * vOut - 0.1);
 }
 
 // -------------------- LEVEL/HYSTERESIS --------------------
@@ -220,7 +206,7 @@ String jsonStatus() {
     js += "\"temp\":" + String(g_temp,1) + ",\"hum\":" + String(g_hum,1) + ",";
   }
   js += "\"gas\":" + String(g_mq2) + ",";
-  js += "\"dust\":" + String(g_dust) + ",";
+  js += "\"dust\":" + String(g_dust,1) + ",";
   js += "\"level\":" + String(g_level) + ",";
   js += "\"level_text\":\"" + envLevelText(g_level) + "\"}";
   return js;
@@ -253,7 +239,15 @@ void setup() {
   display.display();
   delay(400);
 
-  wifiConnect();
+  EEPROM.begin(200);
+  loadWifiConfig();
+  if (saved_ssid.length() > 0) {
+    Serial.println("Dang ket noi WiFi: " + saved_ssid);
+    connectWifi();
+  } else {
+    Serial.println("Chua co cau hinh WiFi, vao che do setup");
+    startConfigMode();
+  }
   ensureNTP();
 
   // HTTP routes
@@ -270,6 +264,11 @@ void setup() {
 // -------------------- LOOP --------------------
 void loop() {
   static uint32_t lastUpd = 0;
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.print("Reconnecting to WiFi...");
+    connectWifi();
+  }
   server.handleClient();   // xử lý HTTP liên tục
 
   if (millis() - lastUpd < UPDATE_MS) return;
@@ -281,7 +280,7 @@ void loop() {
   bool dht_ok = !(isnan(temp) || isnan(hum));
 
   int mq2Raw  = analogRead(MQ2_PIN);
-  int dustRaw = readDustRaw();
+  float dustRaw = readDustDensity();
 
   // EMA (làm mượt)
   if (dht_ok) {
@@ -311,7 +310,7 @@ void loop() {
   }
 
   Level lvGas  = levelWithHysInt((int)emaGas,  MQ2_WARN,  MQ2_DANG,  GAS_HYS,  prevGas);
-  Level lvDust = levelWithHysInt((int)emaDust, DUST_WARN, DUST_DANG, DUST_HYS, prevDust);
+  Level lvDust = levelWithHysFloat(emaDust, DUST_WARN, DUST_DANG, DUST_HYS, prevDust);
 
   // Tổng mức hệ thống
   Level lvAll = (Level)max((int)lvTemp, max((int)lvHum, max((int)lvGas, (int)lvDust)));
@@ -336,7 +335,7 @@ void loop() {
   g_temp  = dht_ok ? emaTemp : NAN;
   g_hum   = dht_ok ? emaHum  : NAN;
   g_mq2   = (int)emaGas;
-  g_dust  = (int)emaDust;
+  g_dust  = emaDust;
   g_level = (int)lvAll;
 
   // ===== SERIAL JSON =====
@@ -345,7 +344,7 @@ void loop() {
                    "\"temp\":" + (dht_ok ? String(emaTemp,1) : "null") + ","
                    "\"hum\":"  + (dht_ok ? String(emaHum,1)  : "null") + ","
                    "\"gas\":"  + String((int)emaGas) + ","
-                   "\"dust\":" + String((int)emaDust) + ","
+                   "\"dust\":" + String(emaDust,1) + ","
                    "\"level\":" + String((int)lvAll) + "}";
   Serial.println(payload);
 
@@ -378,7 +377,8 @@ void loop() {
   display.print("Gas: ");  
   display.print((int)emaGas);
   display.print("  Dust: ");  
-  display.println((int)emaDust);
+  display.print(emaDust,1);
+  display.println("mg/m3");
 
   // Dòng trạng thái môi trường
   display.setCursor(0, 48);
@@ -390,4 +390,252 @@ void loop() {
 
   // Lưu mức cho hysteresis lần sau
   prevTemp = lvTemp; prevHum = lvHum; prevGas = lvGas; prevDust = lvDust;
+}
+
+void loadWifiConfig() {
+  int ssid_len = EEPROM.read(0);
+  if (ssid_len > 0 && ssid_len < 32) {
+    for (int i = 0; i < ssid_len; i++) {
+      saved_ssid += char(EEPROM.read(1 + i));
+    }
+  }
+  
+  int pass_len = EEPROM.read(50);
+  if (pass_len >= 0 && pass_len < 64) {
+    for (int i = 0; i < pass_len; i++) {
+      saved_password += char(EEPROM.read(51 + i));
+    }
+  }
+  
+  Serial.println("WiFi da luu: " + saved_ssid);
+}
+
+// Lưu WiFi vào EEPROM
+void saveWifiConfig(String ssid, String password) {
+  for (int i = 0; i < 150; i++) {
+    EEPROM.write(i, 0);
+  }
+  
+  EEPROM.write(0, ssid.length());
+  for (int i = 0; i < ssid.length(); i++) {
+    EEPROM.write(1 + i, ssid[i]);
+  }
+  
+  EEPROM.write(50, password.length());
+  for (int i = 0; i < password.length(); i++) {
+    EEPROM.write(51 + i, password[i]);
+  }
+  
+  EEPROM.commit();
+  Serial.println("Da luu WiFi: " + ssid);
+}
+
+// Kết nối WiFi
+void connectWifi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(saved_ssid.c_str(), saved_password.c_str());
+  
+  Serial.print("Dang ket noi");
+  int count = 0;
+  while (WiFi.status() != WL_CONNECTED && count < 20) {
+    delay(500);
+    Serial.print(".");
+    count++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("");
+    Serial.println("Ket noi thanh cong!");
+    Serial.println("IP: " + WiFi.localIP().toString());
+    setupNormalServer();
+  } else {
+    Serial.println("");
+    Serial.println("Ket noi that bai! Chuyen sang che do cau hinh");
+    startConfigMode();
+  }
+}
+
+// Chế độ cấu hình
+void startConfigMode() {
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP("SafeSense360", "12345678");
+  
+  Serial.println("");
+  Serial.println("WiFi: SafeSense360");
+  Serial.println("Pass: 12345678");
+  Serial.println("Truy cap: http://192.168.4.1");
+  
+  server.on("/", []() {
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<title>WiFi Config</title>";
+    html += "<meta charset='UTF-8'>";
+    html += "<style>";
+    html += "body{font-family:Arial;max-width:400px;margin:50px auto;padding:20px;}";
+    html += "input,button{width:100%;padding:10px;margin:10px 0;font-size:16px;}";
+    html += "button{background:#4CAF50;color:white;border:none;cursor:pointer;}";
+    html += ".network{background:#f0f0f0;padding:10px;margin:5px 0;cursor:pointer;}";
+    html += "</style></head><body>";
+    html += "<h2>WiFi Configuration</h2>";
+    html += "<button onclick='scanWifi()'>Scan WiFi</button>";
+    html += "<div id='networks'></div>";
+    html += "<form onsubmit='saveWifi(event)'>";
+    html += "<input type='text' id='ssid' placeholder='WiFi' required>";
+    html += "<input type='password' id='password' placeholder='Password'>";
+    html += "<button type='submit'>Connect</button>";
+    html += "</form>";
+    html += "<div id='status'></div>";
+    html += "<script>";
+    html += "function scanWifi(){";
+    html += "document.getElementById('status').innerHTML='Scanning...';";
+    html += "fetch('/scan').then(r=>r.text()).then(data=>{";
+    html += "document.getElementById('networks').innerHTML=data;";
+    html += "document.getElementById('status').innerHTML='';";
+    html += "});}";
+    html += "function selectWifi(ssid){";
+    html += "document.getElementById('ssid').value=ssid;}";
+    html += "function saveWifi(e){";
+    html += "e.preventDefault();";
+    html += "const ssid=document.getElementById('ssid').value;";
+    html += "const pass=document.getElementById('password').value;";
+    html += "document.getElementById('status').innerHTML='...';";
+    html += "fetch('/save',{";
+    html += "method:'POST',";
+    html += "headers:{'Content-Type':'application/x-www-form-urlencoded'},";
+    html += "body:'ssid='+ssid+'&password='+pass";
+    html += "}).then(r=>r.text()).then(data=>{";
+    html += "document.getElementById('status').innerHTML=data;";
+    html += "});}";
+    html += "scanWifi();";
+    html += "</script></body></html>";
+    
+    server.send(200, "text/html", html);
+  });
+  
+  server.on("/scan", []() {
+    Serial.println("Dang quet mang WiFi...");
+    String html = "";
+    int n = WiFi.scanNetworks();
+    
+    if (n > 0) {
+      for (int i = 0; i < n; i++) {
+        html += "<div class='network' onclick='selectWifi(\"" + WiFi.SSID(i) + "\")'>";
+        html += WiFi.SSID(i) + " (" + String(WiFi.RSSI(i)) + " dBm)";
+        html += "</div>";
+      }
+    } else {
+      html = "<p>Khong tim thay mang WiFi nao</p>";
+    }
+    
+    server.send(200, "text/html", html);
+  });
+  
+  // Lưu cấu hình WiFi
+  server.on("/save", HTTP_POST, []() {
+    String ssid = server.arg("ssid");
+    String password = server.arg("password");
+    
+    Serial.println("Nhan cau hinh moi:");
+    Serial.println("SSID: " + ssid);
+    Serial.print("Password: ");
+    if (password.length() > 0) {
+      Serial.println("***");
+    } else {
+      Serial.println("(trong)");
+    }
+    
+    saveWifiConfig(ssid, password);
+    saved_ssid = ssid;
+    saved_password = password;
+    
+    server.send(200, "text/html", "<h3>Successfully connected!<br>Restarting...</h3>");
+    
+    delay(3000);
+    ESP.restart();
+  });
+  
+  server.begin();
+  Serial.println("Web server da khoi dong!");
+}
+
+// Chế độ bình thường
+void setupNormalServer() {
+  server.on("/", []() {
+    String html = "<html><head><title>ESP32 WiFi</title></head><body>";
+    html += "<h2>Connected to WiFi!</h2>";
+    html += "<p><b>Wifi:</b> " + WiFi.SSID() + "</p>";
+    html += "<p><b>IP:</b> " + WiFi.localIP().toString() + "</p>";
+    html += "<p><b>dBm:</b> " + String(WiFi.RSSI()) + " dBm</p>";
+    html += "<br><a href='/config'><button>Switch Wifi</button></a>";
+    html += "</body></html>";
+    server.send(200, "text/html", html);
+  });
+  
+  // Trang cấu hình (có thể truy cập khi đã kết nối)
+  server.on("/config", []() {
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<title>WiFi Config</title>";
+    html += "<meta charset='UTF-8'>";
+    html += "<style>";
+    html += "body{font-family:Arial;max-width:400px;margin:50px auto;padding:20px;}";
+    html += "input,button{width:100%;padding:10px;margin:10px 0;font-size:16px;}";
+    html += "button{background:#4CAF50;color:white;border:none;cursor:pointer;}";
+    html += ".network{background:#f0f0f0;padding:10px;margin:5px 0;cursor:pointer;}";
+    html += "</style></head><body>";
+    html += "<h2>WiFi Configuration</h2>";
+    html += "<button onclick='scanWifi()'>Scan WiFi</button>";
+    html += "<div id='networks'></div>";
+    html += "<form onsubmit='saveWifi(event)'>";
+    html += "<input type='text' id='ssid' placeholder='WiFi' required>";
+    html += "<input type='password' id='password' placeholder='Password'>";
+    html += "<button type='submit'>Connect</button>";
+    html += "</form>";
+    html += "<div id='status'></div>";
+    html += "<script>";
+    html += "function scanWifi(){";
+    html += "document.getElementById('status').innerHTML='Scanning...';";
+    html += "fetch('/scan').then(r=>r.text()).then(data=>{";
+    html += "document.getElementById('networks').innerHTML=data;";
+    html += "document.getElementById('status').innerHTML='';";
+    html += "});}";
+    html += "function selectWifi(ssid){";
+    html += "document.getElementById('ssid').value=ssid;}";
+    html += "function saveWifi(e){";
+    html += "e.preventDefault();";
+    html += "const ssid=document.getElementById('ssid').value;";
+    html += "const pass=document.getElementById('password').value;";
+    html += "document.getElementById('status').innerHTML='...';";
+    html += "fetch('/save',{";
+    html += "method:'POST',";
+    html += "headers:{'Content-Type':'application/x-www-form-urlencoded'},";
+    html += "body:'ssid='+ssid+'&password='+pass";
+    html += "}).then(r=>r.text()).then(data=>{";
+    html += "document.getElementById('status').innerHTML=data;";
+    html += "});}";
+    html += "scanWifi();";
+    html += "</script></body></html>";
+    
+    server.send(200, "text/html", html);
+  });
+  
+  server.on("/scan", []() {
+    String html = "";
+    int n = WiFi.scanNetworks();
+    for (int i = 0; i < n; i++) {
+      html += "<div class='network' onclick='selectWifi(\"" + WiFi.SSID(i) + "\")'>";
+      html += WiFi.SSID(i) + " (" + String(WiFi.RSSI(i)) + " dBm)";
+      html += "</div>";
+    }
+    server.send(200, "text/html", html);
+  });
+  
+  server.on("/save", HTTP_POST, []() {
+    String ssid = server.arg("ssid");
+    String password = server.arg("password");
+    saveWifiConfig(ssid, password);
+    server.send(200, "text/html", "<h3>Successfully connected! Restarting...</h3>");
+    delay(2000);
+    ESP.restart();
+  });
+  
+  server.begin();
 }
