@@ -49,14 +49,14 @@ body {
     justify-items: center;
     margin-top: 2rem;
     padding: 0 10rem;
-    gap: 4rem;
+    gap: 2rem;
 }
 
 .chart {
-    background-color: #FCC0C7;
-    width: 30vw;
-    height: 25vh;
-    border: solid black 1px;
+    width: 70%;
+    margin: 20px;
+    display: inline-block;
+    vertical-align: top;
 }
 
 .export-btn {

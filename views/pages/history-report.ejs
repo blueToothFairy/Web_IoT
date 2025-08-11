@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>History Report</title>
     <link rel="stylesheet" href="/css/history-report.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 </head>
 
 <body>
@@ -15,10 +18,60 @@
             <a href="/logout"><button class="logout-btn">Log Out</button></a>
         </div>
         <div class="chart-grid">
-            <div class="chart" id="Humidity">Chart</div>
-            <div class="chart" id="Temperature">Chart</div>
-            <div class="chart" id="Gas">Chart</div>
-            <div class="chart" id="Dust">Chart</div>
+            <div class="chart" id="Humidity">
+                <canvas id="humidityChart"></canvas>
+            </div>
+            <div class="chart" id="Temperature">
+                <canvas id="temperatureChart"></canvas>
+            </div>
+            <div class="chart" id="Gas">
+                <canvas id="gasChart"></canvas>
+            </div>
+            <div class="chart" id="Dust">
+                <canvas id="dustChart"></canvas>
+            </div>
+            <!-- <canvas id="myChart" width="400" height="200"></canvas> -->
+
+            <script>
+                async function loadData() {
+                    const res = await fetch('/chart-data');
+                    const data = await res.json();
+
+                    const labels = data.map(item => new Date(item.time).toLocaleString());
+                    const temperature = data.map(item => item.temperature);
+                    const humidity = data.map(item => item.humidity);
+                    const dust = data.map(item => item.dust_density);
+                    const gas = data.map(item => item.gas_density);
+
+                    function createChart(ctx, label, data, color) {
+                        new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: label,
+                                    data: data,
+                                    backgroundColor: color
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                scales: {
+                                    x: { title: { display: true, text: 'Time' } },
+                                    y: { beginAtZero: true }
+                                }
+                            }
+                        });
+                    }
+
+                    createChart(document.getElementById('temperatureChart'), 'Temperature (°C)', temperature, 'rgba(255,99,132,0.6)');
+                    createChart(document.getElementById('humidityChart'), 'Humidity (%)', humidity, 'rgba(54,162,235,0.6)');
+                    createChart(document.getElementById('dustChart'), 'Dust Density (mg/m³)', dust, 'rgba(255,206,86,0.6)');
+                    createChart(document.getElementById('gasChart'), 'Gas Density (ppm)', gas, 'rgba(75,192,192,0.6)');
+                }
+
+                loadData();
+            </script>
         </div>
         <button class="export-btn">Export</button>
     </div>

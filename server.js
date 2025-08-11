@@ -29,13 +29,14 @@ const userSchema = new mongoose.Schema({
 }, { collection: "User" });
 const User = mongoose.model('User', userSchema);
 
-const Environment = mongoose.model('Environment', {
+const environmentSchema = new mongoose.Schema({
     time: Date,
     temperature: Number,
     humidity: Number,
     dust_density: Number,
     gas_density: Number
-}, "Environment");
+}, { collection: "Environment" });
+const Environment = mongoose.model('Environment', environmentSchema);
 
 // EJS view setup
 app.set("views", path.join(__dirname, "views"));
@@ -117,6 +118,16 @@ app.get('/logout', (req, res) => {
     });
 });
 
+app.get('/chart-data', async (req, res) => {
+    try {
+        const data = await Environment.find().sort({ time: -1 }).limit(100).exec();
+        console.log(data);
+        res.json(data);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server error');
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Running on port ${PORT}`);
