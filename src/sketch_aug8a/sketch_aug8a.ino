@@ -20,8 +20,11 @@ void setup() {
   OLED_Init();                    // auto-scan 0x3C/0x3D và begin()
 
   // Wi‑Fi + NTP
-  WIFI_Connect();
-  NTP_Ensure();
+  WIFI_Begin();
+
+  if (is_WIFI_Connected()) {
+    NTP_Ensure();
+  }
 
   // Cảm biến
   Sensors_Init();
@@ -36,7 +39,11 @@ void setup() {
 
 void loop() {
   static uint32_t last1Hz = 0;
-
+  
+  if (!is_WIFI_Connected()) {
+    Serial.print("Reconnecting to WiFi...");
+    connectWifi();
+  }
   HTTP_Loop();
 
   if (millis() - last1Hz >= UPDATE_MS) {
