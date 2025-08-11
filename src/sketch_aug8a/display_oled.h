@@ -79,10 +79,11 @@ inline void OLED_Render(const String& timeStr, const EnvState& st) {
   }
 
   display.setCursor(0, 36);
-  display.print(F("Gas: "));
+  display.print(F("Gas:"));
   display.print(st.gas);
-  display.print(F("  Dust: "));
-  display.println(st.dust);
+  display.print(F("  Dust:"));
+  display.print(st.dust);
+  display.println(F("mg/m3"));
 
   display.setCursor(0, 48);
   display.print(F("Status: "));

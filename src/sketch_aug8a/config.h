@@ -22,8 +22,8 @@
 #define SCREEN_HEIGHT  64
 
 // -------------------- WIFI + NTP --------------------
-static const char* WIFI_SSID   = "QuangLuu";
-static const char* WIFI_PASS   = "04112005";
+static String WIFI_SSID = "";
+static String WIFI_PASS = "";
 static const char* NTP_SERVERS[] = {
   "vn.pool.ntp.org",         // Việt Nam pool
   "asia.pool.ntp.org",       // Khu vực Châu Á
@@ -47,8 +47,8 @@ static const float HUM_LOW    = 35.0;   // %
 static const float HUM_HIGH   = 80.0;   // %
 static const int   MQ2_WARN   = 600;    // ADC
 static const int   MQ2_DANG   = 1000;   // ADC
-static const int   DUST_WARN  = 700;    // ADC
-static const int   DUST_DANG  = 1200;   // ADC
+static const float   DUST_WARN  = 0.036;    // ADC
+static const float   DUST_DANG  = 0.056;   // ADC
 
 // Hysteresis
 static const float TEMP_HYS   = 0.8f;
@@ -70,7 +70,7 @@ struct EnvState {
   float temp;       // EMA hoặc NAN
   float hum;        // EMA hoặc NAN
   int   gas;        // EMA int
-  int   dust;       // EMA int
+  float   dust;       // EMA float
   int   level;      // 0/1/2
 };
 

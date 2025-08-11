@@ -18,14 +18,15 @@ static Level prevTemp = LV_OK, prevHum = LV_OK, prevGas = LV_OK, prevDust = LV_O
 static EnvState g_state = {NAN, NAN, 0, 0, 0};
 
 // ---- Dust raw read (y nguyên) ----
-inline int Dust_ReadRaw() {
+inline float Dust_ReadDensity() {
   digitalWrite(G3_PIN, LOW);             // LED ON
   delayMicroseconds(280);
   int v = analogRead(G5_PIN);            // ADC1
   delayMicroseconds(40);
   digitalWrite(G3_PIN, HIGH);            // LED OFF
   delayMicroseconds(9680);               // chu kỳ ~10ms
-  return v; // 0..4095
+  float vOut = v * 3.3 / 4095.0;
+  return (0.17 * vOut - 0.1 < 0) ? 0 : (0.17 * vOut - 0.1);
 }
 
 inline void Sensors_Init() {
@@ -45,7 +46,7 @@ inline void Sensors_Update1Hz() {
   bool dht_ok = !(isnan(t) || isnan(h));
 
   int mq2Raw  = analogRead(MQ2_PIN);
-  int dustRaw = Dust_ReadRaw();
+  float dustRaw = Dust_ReadDensity();
 
   // ===== EMA =====
   if (dht_ok) {
@@ -75,7 +76,7 @@ inline void Sensors_Update1Hz() {
   }
 
   Level lvGas  = levelWithHysInt((int)emaGas,  MQ2_WARN,  MQ2_DANG,  GAS_HYS,  prevGas);
-  Level lvDust = levelWithHysInt((int)emaDust, DUST_WARN, DUST_DANG, DUST_HYS, prevDust);
+  Level lvDust = levelWithHysFloat(emaDust, DUST_WARN, DUST_DANG, DUST_HYS, prevDust);
 
   Level lvAll = (Level)max((int)lvTemp, max((int)lvHumL, max((int)lvGas, (int)lvDust)));
 
@@ -83,7 +84,7 @@ inline void Sensors_Update1Hz() {
   g_state.temp  = dht_ok ? emaTemp : NAN;
   g_state.hum   = dht_ok ? emaHum  : NAN;
   g_state.gas   = (int)emaGas;
-  g_state.dust  = (int)emaDust;
+  g_state.dust  = emaDust;
   g_state.level = (int)lvAll;
 
   // Remember hysteresis
@@ -96,7 +97,7 @@ inline void Sensors_Update1Hz() {
                    "\"temp\":" + (dht_ok ? String(emaTemp,1) : "null") + ","
                    "\"hum\":"  + (dht_ok ? String(emaHum,1)  : "null") + ","
                    "\"gas\":"  + String((int)emaGas) + ","
-                   "\"dust\":" + String((int)emaDust) + ","
+                   "\"dust\":" + String(emaDust,1) + ","
                    "\"level\":" + String((int)lvAll) + "}";
   Serial.println(payload);
 }
