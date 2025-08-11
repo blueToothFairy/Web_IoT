@@ -23,7 +23,8 @@ body {
     border: 1px solid #aaa;
 }
 
-.logout-btn, .goback-btn {
+.logout-btn,
+.home-btn {
     color: white;
     background-color: black;
     border: none;
@@ -96,12 +97,14 @@ body {
         grid-template-columns: 1fr;
         gap: 30px;
     }
+
     .input {
         min-width: 220px;
         min-height: 80px;
         padding: 0 18px;
         font-size: 1.2rem;
     }
+
     .title {
         font-size: 2.2rem;
     }

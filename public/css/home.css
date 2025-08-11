@@ -51,7 +51,7 @@ body {
     font-weight: bold;
     color: #000;
     margin: 0 auto;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .datetime {
@@ -60,6 +60,11 @@ body {
     font-weight: bold;
     margin-top: 30px;
     line-height: 1.2;
+    color: #fff;
+}
+
+.datetime .clock {
+    font-size: 3rem;
 }
 
 .detail {
@@ -103,7 +108,7 @@ body {
     padding: 22px 38px;
     min-width: 220px;
     cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
     transition: background 0.2s;
     font-family: 'Times New Roman', serif;
 }
@@ -123,7 +128,7 @@ body {
     font-size: 1.3rem;
     font-weight: bold;
     font-family: 'Times New Roman', serif;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
 .switch {
@@ -134,12 +139,17 @@ body {
     height: 26px;
 }
 
-.switch input { display: none; }
+.switch input {
+    display: none;
+}
 
 .slider {
     position: absolute;
     cursor: pointer;
-    top: 0; left: 0; right: 0; bottom: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background-color: #bbb;
     border-radius: 26px;
     transition: .4s;
@@ -157,11 +167,11 @@ body {
     transition: .4s;
 }
 
-.switch input:checked + .slider {
+.switch input:checked+.slider {
     background-color: #a00;
 }
 
-.switch input:checked + .slider:before {
+.switch input:checked+.slider:before {
     transform: translateX(22px);
 }
 
@@ -182,7 +192,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
     cursor: pointer;
     border: 2px solid #fff;
 }
@@ -206,13 +216,15 @@ body {
 }
 
 /* Đậm chữ cho các nút */
-.feature-btn, .silent-mode {
+.feature-btn,
+.silent-mode {
     font-family: 'Times New Roman', serif;
     font-weight: bold;
 }
 
 /* Xóa viền đen cho nút và silent-mode */
-.feature-btn, .silent-mode {
+.feature-btn,
+.silent-mode {
     border: none;
 }
 
@@ -223,14 +235,23 @@ body {
         gap: 20px;
         align-items: center;
     }
-    .feature-btn, .silent-mode {
+
+    .feature-btn,
+    .silent-mode {
         min-width: 180px;
         padding: 18px 10px;
         font-size: 1.1rem;
     }
+
     .main-status {
         flex-direction: column;
         gap: 20px;
         padding: 20px 0;
     }
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+    padding: none;
 }

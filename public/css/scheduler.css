@@ -23,7 +23,8 @@ body {
     border: 1px solid #aaa;
 }
 
-.logout-btn, .goback-btn {
+.logout-btn,
+.home-btn {
     color: white;
     background-color: black;
     border: none;
@@ -82,7 +83,7 @@ body {
     border-radius: 4px;
     background: #fff;
     margin-right: 0;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
 .input-select {
@@ -95,7 +96,7 @@ body {
     border: 2px solid #222;
     border-radius: 4px;
     background: #fff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
     cursor: pointer;
 }
 
@@ -118,11 +119,14 @@ body {
     .section-title {
         font-size: 1.2rem;
     }
-    .input-number, .input-select {
+
+    .input-number,
+    .input-select {
         width: 100px;
         height: 38px;
         font-size: 1.1rem;
     }
+
     .label-left {
         width: 100px;
     }

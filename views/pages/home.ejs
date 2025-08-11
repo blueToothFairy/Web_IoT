@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Home</title>
     <link rel="stylesheet" href="/css/home.css">
 </head>
+
 <body>
     <div class="header">
-        <button class="logout-btn">Log Out</button>
+        <a href="/login"><button class="logout-btn">Log Out</button></a>
     </div>
     <div class="main-status">
         <div>
@@ -20,14 +22,14 @@
             Safe
         </div>
         <div class="datetime">
-            hh/mm/ss<br>
-            mm/dd/yyyy
+            <span class="clock" id="clock"></span><br>
+            <span class="date" id="date"></span>
         </div>
     </div>
     <div class="features-title">Features</div>
     <div class="features-grid">
-        <button class="feature-btn">Threshold Setting</button>
-        <button class="feature-btn">Test Alert</button>
+        <a href="/threshold"><button class="feature-btn">Threshold Setting</button></a>
+        <button id="testAlertBtn" class="feature-btn">Test Alert</button>
         <div class="silent-mode">
             Silent Mode
             <label class="switch">
@@ -35,9 +37,9 @@
                 <span class="slider"></span>
             </label>
         </div>
-        <button class="feature-btn">History Report</button>
+        <a href="/chart"><button class="feature-btn">History Report</button></a>
         <button class="feature-btn">Get Instant Data</button>
-        <button class="feature-btn">Scheduler</button>
+        <a href="/scheduler"><button class="feature-btn">Scheduler</button></a>
     </div>
     <div class="chatbot">
         <div class="chatbot-btn">
@@ -47,5 +49,29 @@
         </div>
         <div class="chatbot-label">Chat with<br>bot</div>
     </div>
+
+    <script>
+        function updateClock() {
+            const now = new Date();
+
+            // Format time
+            let hours = now.getHours().toString().padStart(2, '0');
+            let minutes = now.getMinutes().toString().padStart(2, '0');
+            let seconds = now.getSeconds().toString().padStart(2, '0');
+
+            // Format date
+            let day = now.getDate().toString().padStart(2, '0');
+            let month = (now.getMonth() + 1).toString().padStart(2, '0');
+            let year = now.getFullYear();
+
+            document.getElementById("clock").textContent = `${hours}:${minutes}:${seconds}`;
+            document.getElementById("date").textContent = `${month}/${day}/${year}`;
+        }
+
+        // Run clock immediately and update every second
+        setInterval(updateClock, 1000);
+        updateClock();
+    </script>
 </body>
+
 </html>

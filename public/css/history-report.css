@@ -23,7 +23,8 @@ body {
     border: 1px solid #aaa;
 }
 
-.logout-btn, .goback-btn {
+.logout-btn,
+.home-btn {
     color: white;
     background-color: black;
     border: none;
