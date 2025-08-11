@@ -42,7 +42,7 @@ app.get("/chart", (req, res) => res.render("pages/history-report"));
 app.get("/threshold", (req, res) => res.render("pages/threshold-setting"));
 app.get("/scheduler", (req, res) => res.render("pages/scheduler"));
 app.get("/login", (req, res) => res.render("pages/login"));
-app.get("/sign-up", (req, res) => res.render("pages/sign-up"));
+app.get("/register", (req, res) => res.render("pages/register"));
 
 // Login handler
 app.post('/login', async (req, res) => {

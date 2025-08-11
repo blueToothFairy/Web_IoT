@@ -56,9 +56,9 @@ input {
     border: none;
 }
 
-.signup-btn {
-    background-color: black;
-    color: white;
+.register-btn {
+    background-color: #9fc4b4;
+    color: black;
     margin-right: 5px;
 }
 

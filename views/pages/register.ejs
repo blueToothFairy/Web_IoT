@@ -4,16 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SafeSense 360 - Login</title>
-    <link rel="stylesheet" href="/css/sign-up.css">
+    <title>SafeSense 360 - Register</title>
+    <link rel="stylesheet" href="/css/register.css">
 </head>
 
 <body>
     <div class="login-container">
         <h1 class="title">SafeSense 360</h1>
-        <form action="/signup" method="POST">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" required>
+        <form action="/register" method="POST">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" required>
 
             <label for="password">Password</label>
             <input type="password" id="password" name="password" required>
@@ -22,8 +22,7 @@
             <input type="password" id="confirm-password" name="confirm-password" required>
 
             <div class="btn-group">
-                <button type="submit" class="btn signup-btn">Sign Up</button>
-                <button type="button" class="btn login-btn" onclick="login()">Login</button>
+                <button type="submit" class="btn register-btn">Register</button>
             </div>
         </form>
     </div>
