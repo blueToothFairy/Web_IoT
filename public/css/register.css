@@ -67,3 +67,8 @@ input {
     color: black;
     margin-left: 5px;
 }
+
+#error {
+    color: rgb(229, 80, 69);
+    font-weight: 700;
+}

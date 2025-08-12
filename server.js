@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const path = require('path');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
+const nodemailer = require('nodemailer');
 
 const PORT = process.env.PORT || 3000;
 const app = express();
@@ -34,7 +35,8 @@ const environmentSchema = new mongoose.Schema({
     temperature: Number,
     humidity: Number,
     dust_density: Number,
-    gas_density: Number
+    gas_density: Number,
+    level: Number,
 }, { collection: "Environment" });
 const Environment = mongoose.model('Environment', environmentSchema);
 
@@ -62,6 +64,16 @@ function requireLogin(req, res, next) {
     }
     next();
 }
+
+// Register middleware
+const validAccount = async (req, res, next) => {
+    const { email, username, password} = req.body;
+    const user = await User.findOne({ email });
+    if (user) {
+        return res.status(400).json({error: "Existed email. Please try another one."});
+    }
+    next();
+};
 
 // Login handler
 app.post('/login', async (req, res) => {
@@ -111,6 +123,80 @@ app.post('/login', async (req, res) => {
     }
 });
 
+// Register handler
+app.post('/register', validAccount, async (req, res) => {
+    const { email, username, password} = req.body;
+
+    try {
+        await User.create({ email, username, password });
+        res.status(200);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server error');
+    }
+});
+
+// Email-sending handler
+app.post('/send-email', async (req, res) => {
+  const { to, subject, text } = req.body;
+
+  const deliver = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: 'thinhpham2310@gmail.com',        
+      pass: 'yzaz atae hzvm yymn',           
+    },
+    tls: { rejectUnauthorized: false },
+  });
+
+  const mailDetails = {
+    from: 'thinhpham2310@gmail.com',
+    to,
+    subject,
+    text,
+  };
+
+  try {
+    await deliver.sendMail(mailDetails);
+    res.status(200);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Failed to send email');
+  }
+});
+
+// Data-sending from ESP32
+app.post('/data', async (req, res) => {
+    let { time, temp, hum, gas, dust, level } = req.body;
+
+    if (typeof time === 'string' && /^\d{2}:\d{2}:\d{2}$/.test(time)) {
+        const today = new Date();
+        const dateStr = today.toISOString().slice(0, 10); // yyyy-mm-dd
+        time = new Date(`${dateStr}T${time}`);
+    } else {
+        time = new Date(time);
+    }
+
+    try {
+        await Environment.create({
+            time: time,
+            temperature: temp,
+            humidity: hum,
+            dust_density: dust,
+            gas_density: gas,
+            level
+        });
+        res.status(200).send('Data received successfully');
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server error');
+    }
+});
+
+app.listen(PORT, () => {
+    console.log(`Running on port ${PORT}`);
+});
+
 // Logout handler
 app.get('/logout', (req, res) => {
     req.session.destroy(() => {
@@ -129,6 +215,6 @@ app.get('/chart-data', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
     console.log(`Running on port ${PORT}`);
 });

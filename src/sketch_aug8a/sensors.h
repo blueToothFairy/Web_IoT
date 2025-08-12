@@ -4,6 +4,7 @@
 #include "config.h"
 #include "levels.h"
 #include <DHT.h>
+#include <HTTPClient.h>
 
 static DHT dht(DHTPIN, DHTTYPE);
 
@@ -100,6 +101,14 @@ inline void Sensors_Update1Hz() {
                    "\"dust\":" + String(emaDust,1) + ","
                    "\"level\":" + String((int)lvAll) + "}";
   Serial.println(payload);
+
+  HTTPClient client;
+  client.begin("http://192.168.70.67:3000/data");
+  client.addHeader("Content-Type", "application/json");
+
+  int httpCode = client.POST(payload);
+  Serial.println("POST status: " + String(httpCode));
+  client.end();
 }
 
 #endif

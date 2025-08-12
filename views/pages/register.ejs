@@ -11,7 +11,7 @@
 <body>
     <div class="login-container">
         <h1 class="title">SafeSense 360</h1>
-        <form action="/register" method="POST">
+        <form action="/register" method="POST" id="register-form">
             <label for="email">Email</label>
             <input type="email" id="email" name="email" required>
 
@@ -28,12 +28,10 @@
                 <button type="submit" class="btn register-btn">Register</button>
             </div>
         </form>
+
+        <p id="error"></p>
     </div>
-    <script>
-        function login() {
-            window.location.href = "/login";
-        }
-    </script>
+    <script defer src="/js/register.js"></script>
 </body>
 
 </html>
