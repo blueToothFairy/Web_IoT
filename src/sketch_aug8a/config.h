@@ -5,7 +5,7 @@
 
 // -------------------- PINOUT / HARDWARE --------------------
 #define DHTPIN         15
-#define DHTTYPE        22          // DHT22
+#define DHTTYPE        11          // DHT11
 #define BUZZER         13
 #define MQ2_PIN        34
 

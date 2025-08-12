@@ -73,15 +73,16 @@ inline void OLED_Render(const String& timeStr, const EnvState& st) {
   if (!isnan(st.hum)) {
     display.print(F("Hum : "));
     display.print(st.hum, 1);
-    display.println(F(" %"));
+    display.print(F(" %"));
   } else {
     display.println(F("Hum : Loi DHT"));
   }
 
-  display.setCursor(0, 36);
-  display.print(F("Gas:"));
+  display.print(F("  Gas: "));
   display.print(st.gas);
-  display.print(F("  Dust:"));
+
+  display.setCursor(0, 36);
+  display.print(F("Dust: "));
   display.print(st.dust);
   display.println(F("mg/m3"));
 
