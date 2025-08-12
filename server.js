@@ -67,10 +67,10 @@ function requireLogin(req, res, next) {
 
 // Register middleware
 const validAccount = async (req, res, next) => {
-    const { email, username, password} = req.body;
+    const { email, username, password } = req.body;
     const user = await User.findOne({ email });
     if (user) {
-        return res.status(400).json({error: "Existed email. Please try another one."});
+        return res.status(400).json({ error: "Existed email. Please try another one." });
     }
     next();
 };
@@ -125,7 +125,7 @@ app.post('/login', async (req, res) => {
 
 // Register handler
 app.post('/register', validAccount, async (req, res) => {
-    const { email, username, password} = req.body;
+    const { email, username, password } = req.body;
 
     try {
         await User.create({ email, username, password });
@@ -138,31 +138,31 @@ app.post('/register', validAccount, async (req, res) => {
 
 // Email-sending handler
 app.post('/send-email', async (req, res) => {
-  const { to, subject, text } = req.body;
+    const { to, subject, text } = req.body;
 
-  const deliver = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: 'thinhpham2310@gmail.com',        
-      pass: 'yzaz atae hzvm yymn',           
-    },
-    tls: { rejectUnauthorized: false },
-  });
+    const deliver = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: 'thinhpham2310@gmail.com',
+            pass: 'yzaz atae hzvm yymn',
+        },
+        tls: { rejectUnauthorized: false },
+    });
 
-  const mailDetails = {
-    from: 'thinhpham2310@gmail.com',
-    to,
-    subject,
-    text,
-  };
+    const mailDetails = {
+        from: 'thinhpham2310@gmail.com',
+        to,
+        subject,
+        text,
+    };
 
-  try {
-    await deliver.sendMail(mailDetails);
-    res.status(200);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Failed to send email');
-  }
+    try {
+        await deliver.sendMail(mailDetails);
+        res.status(200);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Failed to send email');
+    }
 });
 
 // Data-sending from ESP32
@@ -187,6 +187,7 @@ app.post('/data', async (req, res) => {
             level
         });
         res.status(200).send('Data received successfully');
+        console.log('Data received:', { time, temp, hum, dust, gas, level });
     } catch (err) {
         console.error(err);
         res.status(500).send('Server error');

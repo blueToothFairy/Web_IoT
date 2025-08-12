@@ -103,7 +103,7 @@ inline void Sensors_Update1Hz() {
   Serial.println(payload);
 
   HTTPClient client;
-  client.begin("http://192.168.70.67:3000/data");
+  client.begin("http://192.168.51.69:3000/data");
   client.addHeader("Content-Type", "application/json");
 
   int httpCode = client.POST(payload);
