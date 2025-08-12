@@ -73,7 +73,7 @@ inline void OLED_Render(const String& timeStr, const EnvState& st) {
   if (!isnan(st.hum)) {
     display.print(F("Hum : "));
     display.print(st.hum, 1);
-    display.println(F(" %"));
+    display.print(F(" %"));
   } else {
     display.println(F("Hum : Loi DHT"));
   }
