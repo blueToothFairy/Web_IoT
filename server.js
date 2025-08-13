@@ -216,6 +216,19 @@ app.get('/chart-data', async (req, res) => {
     }
 });
 
+app.get('/latest-data', async (req, res) => {
+    try {
+        const latest = await Environment.findOne().sort({ time: -1 }).exec();
+        console.log(latest);
+        res.json(latest);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server error');
+    }
+});
+
+
+
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Running on port ${PORT}`);
 });

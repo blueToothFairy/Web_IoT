@@ -53,6 +53,7 @@ body {
 }
 
 .chart {
+    max-width: 45rem;
     width: 95%;
     margin: 20px;
     display: inline-block;
