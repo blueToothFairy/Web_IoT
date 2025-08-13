@@ -19,8 +19,8 @@
             <div class="section">
                 <div class="section-title">Interval between measurements</div>
                 <div class="row">
-                    <input type="number" class="input-number" value="5" min="1" max="60">
-                    <select class="input-select">
+                    <input id="interval-value" type="number" class="input-number" value="5" min="1" max="60">
+                    <select id="interval-unit" class="input-select">
                         <option value="min">min</option>
                         <option value="hour">hour</option>
                     </select>
@@ -51,6 +51,42 @@
             </div>
         </form>
     </div>
+    <script>
+        async function loadIntervalFromServer() {
+            try {
+                const res = await fetch('/get-interval');
+                const { value, unit } = await res.json();
+                document.getElementById('interval-value').value = value;
+                document.getElementById('interval-unit').value = unit;
+            } catch (err) {
+                console.error('Failed to load interval:', err);
+            }
+        }
+
+        async function saveIntervalToServer() {
+            const value = parseInt(document.getElementById('interval-value').value, 10);
+            const unit = document.getElementById('interval-unit').value;
+
+            try {
+                await fetch('/set-interval', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value, unit })
+                });
+                alert('Interval saved!');
+            } catch (err) {
+                console.error('Failed to save interval:', err);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadIntervalFromServer();
+            document.getElementById('interval-value').addEventListener('change', saveIntervalToServer);
+            document.getElementById('interval-unit').addEventListener('change', saveIntervalToServer);
+        });
+    </script>
+
+
 </body>
 
 </html>

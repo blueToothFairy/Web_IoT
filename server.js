@@ -187,15 +187,10 @@ app.post('/data', async (req, res) => {
             level
         });
         res.status(200).send('Data received successfully');
-        console.log('Data received:', { time, temp, hum, dust, gas, level });
     } catch (err) {
         console.error(err);
         res.status(500).send('Server error');
     }
-});
-
-app.listen(PORT, () => {
-    console.log(`Running on port ${PORT}`);
 });
 
 // Logout handler
@@ -207,8 +202,8 @@ app.get('/logout', (req, res) => {
 
 app.get('/chart-data', async (req, res) => {
     try {
-        const data = await Environment.find().sort({ time: -1 }).limit(100).exec();
-        console.log(data);
+        const data = await Environment.find().sort({ time: 1 }).exec();
+        // console.log(data);
         res.json(data);
     } catch (err) {
         console.error(err);
@@ -216,10 +211,23 @@ app.get('/chart-data', async (req, res) => {
     }
 });
 
+//interval config
+let intervalConfig = { value: 5, unit: 'min' }; // default
+
+app.get('/get-interval', (req, res) => {
+    res.json(intervalConfig);
+});
+
+app.post('/set-interval', express.json(), (req, res) => {
+    const { value, unit } = req.body;
+    intervalConfig = { value, unit };
+    res.json({ success: true });
+});
+
 app.get('/latest-data', async (req, res) => {
     try {
         const latest = await Environment.findOne().sort({ time: -1 }).exec();
-        console.log(latest);
+        // console.log(latest);
         res.json(latest);
     } catch (err) {
         console.error(err);
