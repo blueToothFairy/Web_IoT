@@ -18,6 +18,9 @@ static Level prevTemp = LV_OK, prevHum = LV_OK, prevGas = LV_OK, prevDust = LV_O
 // Module state (to publish ra ngoài)
 static EnvState g_state = {NAN, NAN, 0, 0, 0};
 
+// Web server IP
+static String webServerIP = "192.168.56.67";
+
 // ---- Dust raw read (y nguyên) ----
 inline float Dust_ReadDensity() {
   digitalWrite(G3_PIN, LOW);             // LED ON
@@ -38,6 +41,36 @@ inline void Sensors_Init() {
 
 inline const EnvState& Sensors_GetState() {
   return g_state;
+}
+
+inline void sendData(String payload) {
+  HTTPClient client;
+  String url1 = "http://" + webServerIP + ":3000/data";
+  client.begin(url1);
+  client.addHeader("Content-Type", "application/json");
+
+  int httpCode = client.POST(payload);
+  Serial.println("POST status: " + String(httpCode));
+  client.end();
+}
+
+inline void checkForTasks(String payload) {
+  HTTPClient client;
+  String url = "http://" + webServerIP + ":3000/check-task";
+  client.begin(url);
+  Serial.println("Checking for tasks...");
+  int httpCode = client.GET();
+
+  Serial.println("Check task response: " + String(httpCode));
+  if (httpCode == 200) {
+      String msg = client.getString();
+      Serial.println("Task message: " + msg);
+      if (msg.indexOf("send-data") != -1) {
+        Serial.println("Found send-data task, sending...");
+        sendData(payload);
+      }
+  }
+  client.end();
 }
 
 inline void Sensors_Update1Hz() {
@@ -102,13 +135,11 @@ inline void Sensors_Update1Hz() {
                    "\"level\":" + String((int)lvAll) + "}";
   Serial.println(payload);
 
-  HTTPClient client;
-  client.begin("http://192.168.56.67:3000/data");
-  client.addHeader("Content-Type", "application/json");
-
-  int httpCode = client.POST(payload);
-  Serial.println("POST status: " + String(httpCode));
-  client.end();
+  if ((int)lvAll == 0) {
+    checkForTasks(payload);
+  } else {
+    sendData(payload);
+  }
 }
 
 #endif

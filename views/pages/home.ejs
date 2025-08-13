@@ -38,7 +38,7 @@
             </label>
         </div>
         <a href="/chart"><button class="feature-btn">History Report</button></a>
-        <button class="feature-btn">Get Instant Data</button>
+        <button class="feature-btn" onclick="requestInstantData()">Get Instant Data</button>
         <a href="/scheduler"><button class="feature-btn">Scheduler</button></a>
     </div>
     <div class="chatbot">
@@ -49,6 +49,8 @@
         </div>
         <div class="chatbot-label">Chat with<br>bot</div>
     </div>
+
+    <script defer src="/js/home.js"></script>
 
     <script>
         function updateClock() {

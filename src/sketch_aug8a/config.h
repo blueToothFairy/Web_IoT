@@ -41,8 +41,8 @@ static const long  GMT_OFFSET_SEC      = 7 * 3600;
 static const int   DAYLIGHT_OFFSET_SEC = 0;
 
 // -------------------- SAFE THRESHOLDS (nhạy hơn) --------------------
-static const float TEMP_WARN  = 33.0;   // °C
-static const float TEMP_DANG  = 36.0;   // °C
+static const float TEMP_WARN  = 36.0;   // °C
+static const float TEMP_DANG  = 38.0;   // °C
 static const float HUM_LOW    = 35.0;   // %
 static const float HUM_HIGH   = 80.0;   // %
 static const int   MQ2_WARN   = 600;    // ADC

@@ -4,8 +4,11 @@ const path = require('path');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
+const cors = require('cors');
 
 const PORT = process.env.PORT || 3000;
+let esp32Task = null; // store command for esp32
+let clients = [];     // store SSE connections
 const app = express();
 
 // Middleware
@@ -16,6 +19,7 @@ app.use(session({
     resave: false,
     saveUninitialized: false
 }));
+app.use(cors()); // cho phép browser ở domain khác kết nối
 
 // Connect to MongoDB
 mongoose.connect('mongodb+srv://vnbtram23:g6yKiJiOXicvmGvB@cluster0.qfxfbpd.mongodb.net/SafeSense360')
@@ -67,10 +71,10 @@ function requireLogin(req, res, next) {
 
 // Register middleware
 const validAccount = async (req, res, next) => {
-    const { email, username, password} = req.body;
+    const { email, username, password } = req.body;
     const user = await User.findOne({ email });
     if (user) {
-        return res.status(400).json({error: "Existed email. Please try another one."});
+        return res.status(400).json({ error: "Existed email. Please try another one." });
     }
     next();
 };
@@ -86,6 +90,7 @@ app.post('/login', async (req, res) => {
             console.log(`Login attempt for user: ${username},Pass: ${user.password}, Match: ${isMatch}`);
             if (isMatch) {
                 req.session.user = { id: user._id, username: user.username }; // store in session
+                console.log(req.session.user);
                 res.redirect('/');
             } else {
                 res.status(401).send(`
@@ -125,11 +130,11 @@ app.post('/login', async (req, res) => {
 
 // Register handler
 app.post('/register', validAccount, async (req, res) => {
-    const { email, username, password} = req.body;
+    const { email, username, password } = req.body;
 
     try {
         await User.create({ email, username, password });
-        res.status(200);
+        res.status(200).send('Register successfully');
     } catch (err) {
         console.error(err);
         res.status(500).send('Server error');
@@ -138,31 +143,31 @@ app.post('/register', validAccount, async (req, res) => {
 
 // Email-sending handler
 app.post('/send-email', async (req, res) => {
-  const { to, subject, text } = req.body;
+    const { to, subject, text } = req.body;
 
-  const deliver = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: 'thinhpham2310@gmail.com',        
-      pass: 'yzaz atae hzvm yymn',           
-    },
-    tls: { rejectUnauthorized: false },
-  });
+    const deliver = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: 'thinhpham2310@gmail.com',
+            pass: 'yzaz atae hzvm yymn',
+        },
+        tls: { rejectUnauthorized: false },
+    });
 
-  const mailDetails = {
-    from: 'thinhpham2310@gmail.com',
-    to,
-    subject,
-    text,
-  };
+    const mailDetails = {
+        from: 'thinhpham2310@gmail.com',
+        to,
+        subject,
+        text,
+    };
 
-  try {
-    await deliver.sendMail(mailDetails);
-    res.status(200);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Failed to send email');
-  }
+    try {
+        await deliver.sendMail(mailDetails);
+        res.status(200).send('Sent email succesfully');
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Failed to send email');
+    }
 });
 
 // Data-sending from ESP32
@@ -186,14 +191,73 @@ app.post('/data', async (req, res) => {
             gas_density: gas,
             level
         });
-        res.status(200).send('Data received successfully');
         console.log('Data received:', { time, temp, hum, gas, dust, level });
+        clients.forEach(c => 
+            c.write(`event: data-ready\ndata: ${JSON.stringify({
+            time: time,
+            temperature: temp,
+            humidity: hum,
+            dust_density: dust,
+            gas_density: gas,
+            level
+        })}\n\n`)
+        );
+
+        res.json({ status: "Data received" });
+
+        // if (level > 0) {
+        //     const email = db.collection_name.find(
+        //         { _id:  req.session.user.id },
+        //         { email: 1, _id: 0 }
+        //     );
+
+        //     const res = await fetch('/send-email', {
+        //         method: "POST",
+        //         headers: { "Content-Type": "application/json" },
+        //         body: JSON.stringify({
+        //             to: email,
+        //             subject: "Greeting from SafeSense360",
+        //             text: "Welcome to SafeSense360 – Breathe Safe, Live Well!\n\nAt SafeSense360, we’re committed to safeguarding your health by delivering precise, real-time air quality insights. Our advanced monitoring solutions empower you to make informed decisions, ensuring a cleaner, safer environment for you and your loved ones.\nThank you for trusting us to protect what matters most—your well-being. Explore our innovative technology and take the first step toward healthier air today!\n\nStay informed. Stay protected. SafeSense360."
+        //         })
+        //     });
+        // } 
     } catch (err) {
         console.error(err);
         res.status(500).send('Server error');
     }
 });
 
+// SSE Endpoint for Client web reciving real-time events
+app.get('/events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    clients.push(res);
+
+    req.on('close', () => {
+        clients = clients.filter(c => c !== res);
+    });
+});
+
+// Get instant data handler
+app.get('/get-instant-data', (req, res) => {
+    console.log('Received instant data request');
+    esp32Task = "send-data";
+    res.json({ status: "Request sent to ESP32" });
+});
+
+// esp32 detects for tasks from web server
+app.get('/check-task', (req, res) => {
+    console.log('ESP32 checking for tasks, current task:', esp32Task);
+    if (esp32Task) {
+        res.json({ task: esp32Task });
+        esp32Task = null;
+    } else {
+        res.json({ task: "none" });
+    }
+});
 app.listen(PORT, () => {
     console.log(`Running on port ${PORT}`);
 });
@@ -215,6 +279,19 @@ app.get('/chart-data', async (req, res) => {
         res.status(500).send('Server error');
     }
 });
+
+app.get('/latest-data', async (req, res) => {
+    try {
+        const latest = await Environment.findOne().sort({ time: -1 }).exec();
+        console.log(latest);
+        res.json(latest);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server error');
+    }
+});
+
+
 
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Running on port ${PORT}`);

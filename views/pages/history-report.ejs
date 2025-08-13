@@ -6,9 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>History Report</title>
     <link rel="stylesheet" href="/css/history-report.css">
-
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 </head>
 
 <body>
@@ -17,6 +15,15 @@
             <a href="/"><button class="home-btn">Home</button></a>
             <a href="/logout"><button class="logout-btn">Log Out</button></a>
         </div>
+
+        <!-- Date pickers -->
+        <div class="date-filters">
+            <label>Start Date: <input type="date" id="startDate"></label>
+            <label>End Date: <input type="date" id="endDate"></label>
+            <button id="filterBtn">Apply</button>
+            <button id="exportBtn">Export CSV</button>
+        </div>
+
         <div class="chart-grid">
             <div class="chart" id="Humidity">
                 <canvas id="humidityChart"></canvas>
@@ -30,51 +37,111 @@
             <div class="chart" id="Dust">
                 <canvas id="dustChart"></canvas>
             </div>
-            <!-- <canvas id="myChart" width="400" height="200"></canvas> -->
-
-            <script>
-                async function loadData() {
-                    const res = await fetch('/chart-data');
-                    const data = await res.json();
-
-                    const labels = data.map(item => new Date(item.time).toLocaleString());
-                    const temperature = data.map(item => item.temperature);
-                    const humidity = data.map(item => item.humidity);
-                    const dust = data.map(item => item.dust_density);
-                    const gas = data.map(item => item.gas_density);
-
-                    function createChart(ctx, label, data, color) {
-                        new Chart(ctx, {
-                            type: 'bar',
-                            data: {
-                                labels: labels,
-                                datasets: [{
-                                    label: label,
-                                    data: data,
-                                    backgroundColor: color
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                scales: {
-                                    x: { title: { display: true, text: 'Time' } },
-                                    y: { beginAtZero: true }
-                                }
-                            }
-                        });
-                    }
-
-                    createChart(document.getElementById('temperatureChart'), 'Temperature (°C)', temperature, 'rgba(255,99,132,0.6)');
-                    createChart(document.getElementById('humidityChart'), 'Humidity (%)', humidity, 'rgba(54,162,235,0.6)');
-                    createChart(document.getElementById('dustChart'), 'Dust Density (mg/m³)', dust, 'rgba(255,206,86,0.6)');
-                    createChart(document.getElementById('gasChart'), 'Gas Density (ppm)', gas, 'rgba(75,192,192,0.6)');
-                }
-
-                loadData();
-            </script>
         </div>
-        <button class="export-btn">Export</button>
+
+        <!-- <button class="export-btn">Export</button> -->
     </div>
+
+    <script>
+        let originalData = [];
+        let filteredData = [];
+        let chartInstances = {};
+
+        async function loadData() {
+            const res = await fetch('/chart-data');
+            originalData = await res.json();
+            filteredData = [...originalData]; // initially no filter
+            drawCharts(filteredData);
+        }
+
+        function drawCharts(data) {
+            filteredData = data; // save latest filtered data for export
+
+            const labels = data.map(item => new Date(item.time).toLocaleString());
+            const temperature = data.map(item => item.temperature);
+            const humidity = data.map(item => item.humidity);
+            const dust = data.map(item => item.dust_density);
+            const gas = data.map(item => item.gas_density);
+
+            function createLineChart(ctxId, label, data, color) {
+                if (chartInstances[ctxId]) {
+                    chartInstances[ctxId].destroy();
+                }
+                chartInstances[ctxId] = new Chart(document.getElementById(ctxId), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: label,
+                            data: data,
+                            borderColor: color,
+                            backgroundColor: color,
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            x: { title: { display: true, text: 'Time' } },
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            }
+
+            createLineChart('temperatureChart', 'Temperature (°C)', temperature, 'rgba(255,99,132,0.8)');
+            createLineChart('humidityChart', 'Humidity (%)', humidity, 'rgba(54,162,235,0.8)');
+            createLineChart('dustChart', 'Dust Density (mg/m³)', dust, 'rgba(255,206,86,0.8)');
+            createLineChart('gasChart', 'Gas Density (ppm)', gas, 'rgba(75,192,192,0.8)');
+        }
+
+        document.getElementById('filterBtn').addEventListener('click', () => {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            if (!startDate || !endDate) {
+                alert("Please select both start and end dates.");
+                return;
+            }
+
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+
+            const filtered = originalData.filter(item => {
+                const itemDate = new Date(item.time);
+                return itemDate >= start && itemDate <= end;
+            });
+
+            drawCharts(filtered);
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            if (filteredData.length === 0) {
+                alert("No data to export.");
+                return;
+            }
+
+            let csv = "Time,Temperature (°C),Humidity (%),Dust Density (mg/m³),Gas Density (ppm)\n";
+            filteredData.forEach(item => {
+                csv += `${new Date(item.time).toLocaleString()},${item.temperature},${item.humidity},${item.dust_density},${item.gas_density}\n`;
+            });
+
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", "environment_data.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        loadData();
+
+    </script>
 </body>
 
 </html>
