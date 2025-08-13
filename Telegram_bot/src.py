@@ -1,341 +1,422 @@
 # pip install python-telegram-bot==20.7 aiohttp
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
-import asyncio
-import aiohttp
-import json
-from typing import Tuple, Union
+from __future__ import annotations
+
 import os
+import json
+import aiohttp
+from typing import Tuple
+
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, ContextTypes,
+    MessageHandler, CallbackQueryHandler, filters
+)
+
+from datetime import datetime, timedelta, timezone
+from telegram.ext import JobQueue
+
+ALERT_POLL_SEC = 10          # chu kỳ kiểm tra (giây)
+ALERT_REMIND_MIN = 1         # nhắc lại nếu level nguy hiểm sau X phút
+DANGER_LEVEL = 2             # ngưỡng coi là nguy hiểm
+
 # ================== CONFIG ==================
 BOT_TOKEN   = "8105980539:AAE8fjSNKsqte2icOchMXt1u9RL0qWJb_QU"
-
-AIO_USERNAME = "luuquang2005"  # <--- sửa
-AIO_KEY      = "aio_Udfe24Z4Jur2XTDkGTy2QZRMBZ82"       # <--- sửa
-AIO_BASE     = f"https://io.adafruit.com/api/v2/{AIO_USERNAME}"
+BASE_URL    = "http://127.0.0.1:3000"    # <-- web backend của bạn
 
 # ==== GEMINI AI CONFIG ====
-GEMINI_MODEL   = "gemini-2.0-flash"  # nhanh & rẻ; có free tier
-GEMINI_API_KEY = "AIzaSyCRDxRjCRjbOMu8xdjpWz6n_iVZlgFGlzc"  # <-- dán key trực tiếp, hoặc để None để đọc ENV
+GEMINI_MODEL   = "gemini-2.0-flash"
+GEMINI_API_KEY = "AIzaSyCRDxRjCRjbOMu8xdjpWz6n_iVZlgFGlzc"
 GEMINI_TIMEOUT = aiohttp.ClientTimeout(total=12)
-AI_TIMEOUT     = aiohttp.ClientTimeout(total=12)  # timeout riêng cho AI
+AI_TIMEOUT     = aiohttp.ClientTimeout(total=12)
 
-FEED_TEMP = "nhiet-do"   # nhiệt độ
-FEED_HUM  = "do-am"      # độ ẩm
-FEED_GAS  = "gas"        # gas
-FEED_DUST = "bui"        # bụi
-FEED_CMD  = "cmd"        # feed lệnh (tạo thêm trên Adafruit IO)
-
-
-HTTP_TIMEOUT = aiohttp.ClientTimeout(total=8)
+HTTP_TIMEOUT   = aiohttp.ClientTimeout(total=8)
 # ============================================
 
-# Lưu chat_id để có thể notify chủ động nếu cần
 LAST_CHAT_ID: int | None = None
 
+
+# ============== UI ==============
 def main_menu_markup() -> InlineKeyboardMarkup:
     kb = [
-        [InlineKeyboardButton("🔊 ON", callback_data="on"),
-         InlineKeyboardButton("🔇 OFF", callback_data="off")],
-        [InlineKeyboardButton("🧪 Test buzzer", callback_data="test"),
-         InlineKeyboardButton("📊 Status", callback_data="status")],
-        [InlineKeyboardButton("❓ Help", callback_data="help")]
+        [InlineKeyboardButton("📋 Menu", callback_data="main_menu")]
     ]
     return InlineKeyboardMarkup(kb)
 
-# ---------- Adafruit IO REST helpers ----------
-async def aio_post(session: aiohttp.ClientSession, feed: str, value: str) -> Tuple[bool, str]:
-    url = f"{AIO_BASE}/feeds/{feed}/data"
-    headers = {"X-AIO-Key": AIO_KEY, "Content-Type": "application/json"}
-    try:
-        async with session.post(url, headers=headers, json={"value": value}) as r:
-            txt = await r.text()
-            return (200 <= r.status < 300), f"HTTP {r.status}: {txt}"
-    except Exception as e:
-        return False, f"REST error: {e}"
+def submenu_markup() -> InlineKeyboardMarkup:
+    kb = [
+        [InlineKeyboardButton("📊 Status", callback_data="status")],
+        [InlineKeyboardButton("🕘 History", callback_data="history")],
+        [InlineKeyboardButton("❓ Help", callback_data="help")],
+        [InlineKeyboardButton("🔔 Alerts ON", callback_data="alerts_on")],
+        [InlineKeyboardButton("🔕 Alerts OFF", callback_data="alerts_off")]
+    ]
+    return InlineKeyboardMarkup(kb)
 
-async def aio_latest(session: aiohttp.ClientSession, feed: str) -> Tuple[bool, Union[dict, str]]:
-    url = f"{AIO_BASE}/feeds/{feed}/data/last"
-    headers = {"X-AIO-Key": AIO_KEY}
-    try:
-        async with session.get(url, headers=headers) as r:
-            txt = await r.text()
-            if 200 <= r.status < 300:
-                return True, json.loads(txt)
-            return False, f"HTTP {r.status}: {txt}"
-    except Exception as e:
-        return False, f"REST error: {e}"
 
-# ---------- Commands ----------
+
+# ============== HTTP helpers ==============
+
+from datetime import datetime, timedelta, timezone  # đảm bảo đã import
+
+async def poll_alerts_job(context: ContextTypes.DEFAULT_TYPE):
+    job = context.job
+    jd  = job.data  # <-- state tại đây
+    chat_id = jd["chat_id"]
+
+    last_seen_id   = jd.get("last_seen_id")
+    last_level     = jd.get("last_level")
+    last_remind_ts = jd.get("last_remind_ts")  # datetime (UTC) hoặc None
+
+    # lấy dữ liệu mới nhất
+    async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
+        try:
+            latest = await fetch_json(s, "/latest")
+        except Exception:
+            try:
+                data = await fetch_json(s, "/chart-data")
+                latest = data[0] if data else None
+            except Exception:
+                latest = None
+
+    if not latest:
+        return
+
+    # chuẩn hóa _id
+    doc_id = latest.get("_id", latest.get("id"))
+    if isinstance(doc_id, dict) and "$oid" in doc_id:
+        doc_id = doc_id["$oid"]
+
+    level = latest.get("level", None)
+    if level is None:
+        return
+
+    tstr  = latest.get("time")
+    temp  = latest.get("temperature")
+    hum   = latest.get("humidity")
+    gas   = latest.get("gas_density")
+    dust  = latest.get("dust_density")
+
+    # quyết định thông báo
+    should_notify = False
+
+    if doc_id and doc_id != last_seen_id:
+        if (last_level is None) or (level != last_level):
+            should_notify = True
+    elif level != last_level:
+        should_notify = True
+    else:
+        if level >= DANGER_LEVEL:
+            now = datetime.now(timezone.utc)
+            if (last_remind_ts is None) or (now - last_remind_ts >= timedelta(minutes=ALERT_REMIND_MIN)):
+                should_notify = True
+
+    if should_notify:
+        text = (
+            f"🔔 <b>Cảnh báo mức {level}</b> – {badge_from_level(level)}\n"
+            f"🕒 Thời điểm: <i>{tstr}</i>\n"
+            f"{fmt_value('🌡️ Temp', temp, '°C')}\n"
+            f"{fmt_value('💧 Hum',  hum, '%')}\n"
+            f"{fmt_value('🧪 Gas',  gas)}\n"
+            f"{fmt_value('🌫️ Dust', dust)}"
+        )
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
+        except Exception:
+            pass
+
+        # cập nhật STATE trong job.data
+        jd["last_level"] = level
+        jd["last_seen_id"] = doc_id
+        jd["last_remind_ts"] = datetime.now(timezone.utc)
+
+
+async def fetch_json(session: aiohttp.ClientSession, path: str):
+    url = f"{BASE_URL}{path}"
+    async with session.get(url) as r:
+        if r.status != 200:
+            txt = await r.text()
+            raise RuntimeError(f"HTTP {r.status}: {txt}")
+        return await r.json()
+
+async def _ensure_alert_job_for_chat(context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+    job_name = f"alerts_{chat_id}"
+
+    for j in context.application.job_queue.get_jobs_by_name(job_name):
+        j.schedule_removal()
+
+    context.application.job_queue.run_repeating(
+        poll_alerts_job,
+        interval=ALERT_POLL_SEC,
+        first=0,
+        name=job_name,
+        data={
+            "chat_id": chat_id,
+            "last_seen_id": None,
+            "last_level": None,
+            "last_remind_ts": None,  # datetime (UTC)
+        },
+    )
+
+
+
+# ============== Formatting helpers ==============
+def badge_from_level(level):
+    if level == 0: return "🟢 An toàn"
+    if level == 1: return "🟠 Cảnh báo"
+    if level == 2: return "🔴 Nguy hiểm"
+    return "⚪️ Không rõ"
+
+def fmt_value(name, v, unit=""):
+    return f"{name}: <b>{v}</b>{(' ' + unit) if unit else ''}" if v is not None else f"{name}: ?"
+
+
+# ============== Commands/Actions ==============
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global LAST_CHAT_ID
     LAST_CHAT_ID = update.effective_chat.id
+
+    # Bật theo dõi khi người dùng start
+    await _ensure_alert_job_for_chat(context, LAST_CHAT_ID)
+
     msg = (
-        "👋 <b>Xin chào</b>! Bot đang kết nối qua <b>Adafruit IO</b>.\n\n"
-        "Lệnh:\n"
-        "• /on – Bật (cmd)\n"
-        "• /off – Tắt (cmd)\n"
-        "• /test – Test buzzer (cmd)\n"
-        "• /status – Đọc dữ liệu từ feeds\n\n"
-        f"Feeds: <code>{FEED_TEMP}</code>, <code>{FEED_HUM}</code>, "
-        f"<code>{FEED_GAS}</code>, <code>{FEED_DUST}</code>, cmd=<code>{FEED_CMD}</code>"
+        "👋 <b>Xin chào</b>! Bot đã <b>bật theo dõi cảnh báo</b> tự động.\n\n"
+        "Lệnh nhanh:\n"
+        "• /status – Trạng thái cảm biến mới nhất\n"
+        "• /history – 5 bản ghi gần nhất\n"
+        "• /alerts_on – Bật theo dõi cảnh báo\n\n"
+        "• /alerts_off – Tắt theo dõi cảnh báo\n\n"
+        "Nhấn 📋 Menu để xem tuỳ chọn."
     )
+
     if update.message:
         await update.message.reply_text(msg, parse_mode="HTML", reply_markup=main_menu_markup())
     else:
         await context.bot.send_message(chat_id=LAST_CHAT_ID, text=msg, parse_mode="HTML", reply_markup=main_menu_markup())
 
+async def alerts_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    await _ensure_alert_job_for_chat(context, chat_id)
+    await _reply(update, f"✅ Đã bật theo dõi cảnh báo (mỗi {ALERT_POLL_SEC}s).")
+
+async def alerts_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    job_name = f"alerts_{chat_id}"
+    jobs = context.application.job_queue.get_jobs_by_name(job_name)
+    if not jobs:
+        await _reply(update, "ℹ️ Theo dõi đang tắt.")
+        return
+    for j in jobs:
+        j.schedule_removal()
+    await _reply(update, "🛑 Đã tắt theo dõi cảnh báo.")
+
+
+
+
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await start(update, context)
 
-async def cmd_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-        ok, res = await aio_post(s, FEED_CMD, "on")
-    await _reply(update, "✅ Đã gửi lệnh <b>ON</b>." if ok else f"❌ {res}")
-
-async def cmd_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-        ok, res = await aio_post(s, FEED_CMD, "off")
-    await _reply(update, "✅ Đã gửi lệnh <b>OFF</b>." if ok else f"❌ {res}")
-
-async def cmd_test(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-        ok, res = await aio_post(s, FEED_CMD, "test")
-    await _reply(update, "✅ Đã gửi lệnh <b>Test</b>." if ok else f"❌ {res}")
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-        okT, t = await aio_latest(s, FEED_TEMP)
-        okH, h = await aio_latest(s, FEED_HUM)
-        okG, g = await aio_latest(s, FEED_GAS)
-        okD, d = await aio_latest(s, FEED_DUST)
+        try:
+            latest = await fetch_json(s, "/latest")
+        except Exception:
+            try:
+                data = await fetch_json(s, "/chart-data")
+            except Exception as e:
+                await _reply(update, f"❌ Lỗi lấy dữ liệu: {e}")
+                return
+            if not data:
+                await _reply(update, "❌ Chưa có dữ liệu.")
+                return
+            latest = data[0]
 
-    if not (okT and okH and okG and okD):
-        msg = "❌ Lỗi đọc feed:\n"
-        for ok, name, val in [(okT,FEED_TEMP,t),(okH,FEED_HUM,h),(okG,FEED_GAS,g),(okD,FEED_DUST,d)]:
-            if not ok: msg += f"- {name}: {val}\n"
-        await _reply(update, msg)
+    temp  = latest.get("temperature")
+    hum   = latest.get("humidity")
+    gas   = latest.get("gas_density")
+    dust  = latest.get("dust_density")
+    tstr  = latest.get("time")
+    level = latest.get("level", None)
+
+    text = (
+        f"📊 <b>Trạng thái mới nhất</b>\n"
+        f"🕒 Thời điểm: <i>{tstr}</i>\n"
+        f"{fmt_value('🌡️ Temp', temp, '°C')}\n"
+        f"{fmt_value('💧 Hum', hum, '%')}\n"
+        f"{fmt_value('🧪 Gas', gas)}\n"
+        f"{fmt_value('🌫️ Dust', dust)}\n"
+        f"🔔 Mức cảnh báo: <b>{badge_from_level(level)}</b>"
+    )
+    await _reply(update, text)
+
+
+async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
+        try:
+            data = await fetch_json(s, "/chart-data")
+        except Exception as e:
+            await _reply(update, f"❌ Lỗi lấy lịch sử: {e}")
+            return
+
+    if not data:
+        await _reply(update, "❌ Chưa có dữ liệu.")
         return
 
-    def v(x):  # lấy value
-        return (x.get("value") if isinstance(x, dict) else "?")
+    rows = []
+    for idx, doc in enumerate(data[:10], start=1):
+        temp = doc.get("temperature")
+        hum  = doc.get("humidity")
+        gas  = doc.get("gas_density")
+        dust = doc.get("dust_density")
+        tstr = doc.get("time")
+        level = doc.get("level", None)
 
-    pretty = (
-        "📊 <b>ESP32 Status (Adafruit IO)</b>\n"
-        f"🌡️ Temp: {v(t)} °C\n"
-        f"💧 Hum : {v(h)} %\n"
-        f"🧪 Gas : {v(g)}\n"
-        f"🌫️ Dust: {v(d)}"
-    )
-    await _reply(update, pretty)
+        # Ví dụ format: "1) 🟠 Cảnh báo | 2025-08-11T10:00:00 : T=30°C; H=60%; Gas=0.05; Dust=0.12"
+        row = (
+            f"{idx}) {badge_from_level(level)} | {tstr}:\n"
+            f"    🌡️ {temp}°C | 💧 {hum}% | 🧪 {gas} | 🌫️ {dust}"
+        )
+        rows.append(row)
 
-# ---------- Buttons & text ----------
+    await _reply(update, "\n".join(rows) or "(empty)", parse_mode="HTML")
+
+
+
+# ============== Buttons & Text Routing ==============
 async def on_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    # tạo fake update để tái dùng handlers
+    data = query.data
     fake_update = Update(update.update_id, message=update.effective_message)
-    if query.data == "on":     await cmd_on(fake_update, context)
-    elif query.data == "off":  await cmd_off(fake_update, context)
-    elif query.data == "test": await cmd_test(fake_update, context)
-    elif query.data == "status": await cmd_status(fake_update, context)
-    elif query.data == "help":   await start(fake_update, context)
+
+    if data == "main_menu":
+        await query.edit_message_reply_markup(reply_markup=submenu_markup())
+
+    elif data == "back_main":
+        await query.edit_message_reply_markup(reply_markup=main_menu_markup())
+
+    elif data == "status":
+        await cmd_status(fake_update, context)
+
+    elif data == "history":
+        await cmd_history(fake_update, context)
+
+    elif data == "help":
+        await start(fake_update, context)
+    elif data == "alerts_on":
+        await alerts_on(fake_update, context)
+    elif data == "alerts_off":
+        await alerts_off(fake_update, context)
+
+
 
 async def reply_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     txt = (update.message.text or "").lower().strip()
-    if txt in ("on","bật","bật buzzer","mo buzzer"):               await cmd_on(update, context)
-    elif txt in ("off","tắt","tắt buzzer","tat buzzer"):           await cmd_off(update, context)
-    elif "test" in txt:                                            await cmd_test(update, context)
-    elif "status" in txt or "trạng thái" in txt:                   await cmd_status(update, context)
-    elif "menu" in txt or "help" in txt or "hướng dẫn" in txt:     await start(update, context)
-    else:
-        await update.message.reply_text("🤖 Gõ /menu để xem các nút lệnh.")
 
-# ---------- small util ----------
-async def _reply(update: Update, text: str, *, parse_mode: str = "HTML"):
-    if update.message:
-        await update.message.reply_text(text, parse_mode=parse_mode)
-    else:
-        # khi gọi từ callback button
-        chat_id = update.effective_chat.id
-        await update.get_bot().send_message(chat_id=chat_id, text=text, parse_mode=parse_mode)
+    if any(k in txt for k in ["trạng thái", "status"]):
+        await cmd_status(update, context); return
+    if any(k in txt for k in ["history", "lịch sử", "lich su"]):
+        await cmd_history(update, context); return
+    if any(k in txt for k in ["menu", "help", "hướng dẫn"]):
+        await start(update, context); return
 
-# ---- GEMINI AI CALL (FIXED) ----
-async def ai_chat(session: aiohttp.ClientSession, user_text: str, ctx_text: str = "") -> tuple[bool, str]:
-    """
-    Gọi Google Gemini để trả lời câu hỏi ngoài lề.
-    Trả về (True, câu trả lời) hoặc (False, thông báo lỗi).
-    """
-    api_key = GEMINI_API_KEY or os.getenv("GEMINI_API_KEY")
-    if not api_key:
+    ctx_text = ""
+    async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
+        try:
+            latest = await fetch_json(s, "/latest")
+        except Exception:
+            try:
+                data = await fetch_json(s, "/chart-data")
+                latest = data[0] if data else {}
+            except Exception:
+                latest = {}
+    if latest:
+        ctx_text = json.dumps(latest, ensure_ascii=False)
+
+    async with aiohttp.ClientSession(timeout=AI_TIMEOUT) as s:
+        ok, ans = await ai_chat(s, update.message.text, ctx_text)
+
+    if ok:
+        await update.message.reply_text(ans, parse_mode="HTML")
+    else:
+        await update.message.reply_text("🤖 Mình chưa hiểu, gõ /menu để xem lệnh.")
+
+
+# ============== AI (Gemini) ==============
+async def ai_chat(session: aiohttp.ClientSession, user_text: str, ctx_text: str = "") -> Tuple[bool, str]:
+    if not GEMINI_API_KEY:
         return False, "Chưa cấu hình GEMINI_API_KEY."
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
     system_prompt = (
-    "Bạn là trợ lý ngắn gọn cho Telegram bot theo dõi ESP32 qua Adafruit IO. "
-    "QUY TẮC: 1) Luôn trả lời bằng TIẾNG VIỆT."
-    "2) Không tự bịa số liệu thiết bị"
-    "3) Nếu người dùng muốn điều khiển, gợi ý /on, /off, /test, /status hoặc nút Menu. "
-    "4) Câu hỏi ngoài lề: trả lời rất ngắn, lịch sự."
-    )   
-
-    FEW_SHOTS = [
-        {"role": "user",  "parts": [{"text": "bật buzzer đi"}]},
-        {"role": "model", "parts": [{"text": "Để bật còi, dùng /test hoặc nút “Buzzer”."}]},
-        {"role": "user",  "parts": [{"text": "nhiệt độ phòng là bao nhiêu"}]},
-        {"role": "model", "parts": [{"text": "Dùng /status để xem nhiệt độ, độ ẩm, khói và gas mới nhất."}]},
-        {"role": "user",  "parts": [{"text": "kể chuyện cười"}]},
-        {"role": "model", "parts": [{"text": "Mình là bot theo dõi ESP32, mình trả lời ngắn thôi. Bạn cần /menu không?"}]},
-    ]
-
+        "Bạn là trợ lý ngắn gọn cho Telegram bot theo dõi ESP32 qua Website backend. "
+        "QUY TẮC: 1) Luôn trả lời bằng TIẾNG VIỆT. "
+        "2) Không tự bịa số liệu thiết bị. "
+        "3) Nếu người dùng muốn điều khiển, gợi ý /status hoặc dùng Menu. "
+        "4) Câu hỏi ngoài lề: trả lời rất ngắn, lịch sự."
+    )
 
     payload = {
-    "systemInstruction": {"role": "user", "parts": [{"text": system_prompt}]},
-    "contents": FEW_SHOTS + [{
-        "role": "user",
-        "parts": [{"text": f"Ngữ cảnh: {ctx_text}\n\nNgười dùng: {user_text}"}]
-    }],
-    "generationConfig": {"temperature": 0.2, "maxOutputTokens": 120}
+        "systemInstruction": {"role": "user", "parts": [{"text": system_prompt}]},
+        "contents": [{
+            "role": "user",
+            "parts": [{"text": f"Ngữ cảnh cảm biến: {ctx_text}\n\nNgười dùng: {user_text}"}]
+        }],
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 120}
     }
-
 
     try:
         async with session.post(url, json=payload, timeout=AI_TIMEOUT) as r:
             data = await r.json()
             if 200 <= r.status < 300:
-                # Lấy text theo cấu trúc chuẩn của Gemini
-                text = ""
                 try:
-                    text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    if not text:
+                        text = "🤖 (AI không trả về nội dung.)"
                 except Exception:
                     text = str(data)
-                text = (text or "").strip()
-                if not text:
-                    text = "🤖 (AI không trả về nội dung.)"
                 return True, text
             else:
                 return False, f"AI HTTP {r.status}: {data}"
     except Exception as e:
         return False, f"AI error: {e}"
 
-# Xử lý tin nhắn dạng text (từ khóa)
-async def reply_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    txt = (update.message.text or "").lower().strip()
 
-    if "bật" in txt or "mở" in txt or "on" in txt:
-        async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-            ok, res = await aio_post(s, FEED_CMD, "on")
-        await update.message.reply_text("✅ Đã gửi lệnh <b>ON</b>." if ok else f"❌ {res}", parse_mode="HTML")
-
-    elif "tắt" in txt or "off" in txt:
-        async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-            ok, res = await aio_post(s, FEED_CMD, "off")
-        await update.message.reply_text("✅ Đã gửi lệnh <b>OFF</b>." if ok else f"❌ {res}", parse_mode="HTML")
-
-    elif "test" in txt:
-        async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-            ok, res = await aio_post(s, FEED_CMD, "test")
-        await update.message.reply_text("✅ Đã gửi lệnh <b>Test</b>." if ok else f"❌ {res}", parse_mode="HTML")
-
-    elif any(k in txt for k in ["trạng thái", "status", "tất cả", "tat ca", "all"]):
-        async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-            okT, t = await aio_latest(s, FEED_TEMP)
-            okH, h = await aio_latest(s, FEED_HUM)
-            okG, g = await aio_latest(s, FEED_GAS)
-            okD, d = await aio_latest(s, FEED_DUST)
-
-        if not (okT and okH and okG and okD):
-            msg = "❌ Lỗi đọc feed:\n"
-            for ok, name, val in [(okT,FEED_TEMP,t),(okH,FEED_HUM,h),(okG,FEED_GAS,g),(okD,FEED_DUST,d)]:
-                if not ok: msg += f"- {name}: {val}\n"
-            await update.message.reply_text(msg)
-            return
-
-        def v(x): return x.get("value") if isinstance(x, dict) else "?"
-        pretty = (
-            "📊 <b>ESP32 Status</b>\n"
-            f"🌡️ Temp: {v(t)} °C\n"
-            f"💧 Hum : {v(h)} %\n"
-            f"🧪 Gas : {v(g)}\n"
-            f"🌫️ Dust: {v(d)}"
-        )
-        await update.message.reply_text(pretty, parse_mode="HTML")
-
-    elif any(k in txt for k in ["nhiệt độ", "nhiet do", "nhiệt", "nhiet", "temp", "temperature"]):
-        async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-            ok, d = await aio_latest(s, FEED_TEMP)
-        if ok:
-            val = d.get("value")
-            await update.message.reply_text(f"🌡️ Nhiệt độ hiện tại: <b>{val} °C</b>", parse_mode="HTML")
-        else:
-            await update.message.reply_text(f"❌ Lỗi đọc nhiệt độ: {d}")
-
-    elif any(k in txt for k in ["độ ẩm", "do am", "độÂm", "humidity", "hum", "ẩm", "am"]):
-        async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-            ok, d = await aio_latest(s, FEED_HUM)
-        if ok:
-            val = d.get("value")
-            await update.message.reply_text(f"💧 Độ ẩm hiện tại: <b>{val} %</b>", parse_mode="HTML")
-        else:
-            await update.message.reply_text(f"❌ Lỗi đọc độ ẩm: {d}")
-
-    elif any(k in txt for k in ["gas", "khí gas", "mq2"]):
-        async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-            ok, d = await aio_latest(s, FEED_GAS)
-        if ok:
-            val = d.get("value")
-            await update.message.reply_text(f"🧪 Gas (MQ-2): <b>{val}</b>", parse_mode="HTML")
-        else:
-            await update.message.reply_text(f"❌ Lỗi đọc gas: {d}")
-
-    elif any(k in txt for k in ["bụi", "bui", "dust", "pm"]):
-        async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-            ok, d = await aio_latest(s, FEED_DUST)
-        if ok:
-            val = d.get("value")
-            await update.message.reply_text(f"🌫️ Bụi: <b>{val}</b>", parse_mode="HTML")
-        else:
-            await update.message.reply_text(f"❌ Lỗi đọc bụi: {d}")
+# ============== Reply helper ==============
+async def _reply(update: Update, text: str, *, parse_mode: str = "HTML"):
+    if update.message:
+        await update.message.reply_text(text, parse_mode=parse_mode)
     else:
-    # Lấy context nhanh từ các feed
-        ctx_lines = []
-        async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
-            okT, t = await aio_latest(s, FEED_TEMP)
-            okH, h = await aio_latest(s, FEED_HUM)
-            okG, g = await aio_latest(s, FEED_GAS)
-            okD, d = await aio_latest(s, FEED_DUST)
-        def _v(x): return (x.get("value") if isinstance(x, dict) else "?")
-        if okT: ctx_lines.append(f"Temp={_v(t)} °C")
-        if okH: ctx_lines.append(f"Hum={_v(h)} %")
-        if okG: ctx_lines.append(f"Gas={_v(g)}")
-        if okD: ctx_lines.append(f"Dust={_v(d)}")
-        ctx = " | ".join(ctx_lines) if ctx_lines else "no sensor context"
-
-        # Gọi AI
-        async with aiohttp.ClientSession(timeout=AI_TIMEOUT) as s:
-            ok, ans = await ai_chat(s, txt, ctx)
-        if ok:
-            await update.message.reply_text(ans, parse_mode="HTML")
-        else:
-            await update.message.reply_text("🤖 Mình chưa hiểu, gõ /menu để xem lệnh.")
+        chat_id = update.effective_chat.id
+        await update.get_bot().send_message(chat_id=chat_id, text=text, parse_mode=parse_mode)
 
 
-
-
-# ---------- main ----------
+# ============== main ==============
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    # --- PATCH: bảo đảm có JobQueue ---
+    if app.job_queue is None:
+        jq = JobQueue()
+        jq.set_application(app)
+        jq.start()
+        app.job_queue = jq
+    # ----------------------------------
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
-    app.add_handler(CommandHandler("on", cmd_on))
-    app.add_handler(CommandHandler("off", cmd_off))
-    app.add_handler(CommandHandler("test", cmd_test))
     app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("history", cmd_history))
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_text))
-    app.add_handler(MessageHandler(filters.COMMAND, reply_text))  # xử lý lệnh từ bàn phím
-    print("✅ Bot is running (Adafruit IO). Press Ctrl+C to stop.")
+    app.add_handler(MessageHandler(filters.COMMAND, reply_text))
+    app.add_handler(CommandHandler("alerts_on", alerts_on))
+    app.add_handler(CommandHandler("alerts_off", alerts_off))
+
+    print("✅ Bot is running. Press Ctrl+C to stop.")
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()
