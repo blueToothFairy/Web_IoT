@@ -187,6 +187,7 @@ app.post('/data', async (req, res) => {
             level
         });
         res.status(200).send('Data received successfully');
+        console.log('Data received:', { time, temp, hum, gas, dust, level });
     } catch (err) {
         console.error(err);
         res.status(500).send('Server error');
