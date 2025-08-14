@@ -82,6 +82,13 @@ body {
     margin-right: 8px;
 }
 
+.detail:hover,
+.arrow:hover {
+    cursor: pointer;
+    color: #83E8C3;
+    transition: color 0.2s;
+}
+
 .features-title {
     text-align: center;
     font-size: 3rem;

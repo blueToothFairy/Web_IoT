@@ -13,9 +13,15 @@
     </div>
     <div class="main-status">
         <div>
-            <div class="detail">
+            <div class="detail" id="detail-toggle">
                 <span class="arrow">&#9660;</span>
                 Detail
+            </div>
+            <div id="detail-content" style="display:none; margin-left: 20px;">
+                <p>Temperature: <span id="temp-value">--</span> °C</p>
+                <p>Humidity: <span id="humidity-value">--</span> %</p>
+                <p>Dust: <span id="dust-value">--</span> µg/m³</p>
+                <p>Gas: <span id="gas-value">--</span> ppm</p>
             </div>
         </div>
         <div class="status-circle">
@@ -51,6 +57,34 @@
     </div>
 
     <script>
+        // Deltail
+        const detailToggle = document.getElementById("detail-toggle");
+        const detailContent = document.getElementById("detail-content");
+
+        detailToggle.addEventListener("click", async () => {
+            const isVisible = detailContent.style.display === "block";
+            if (isVisible) {
+                detailContent.style.display = "none";
+                detailToggle.querySelector(".arrow").innerHTML = "&#9660;"; // down arrow
+            } else {
+                // Fetch latest data
+                try {
+                    const res = await fetch('/latest-data');
+                    const data = await res.json();
+
+                    document.getElementById("temp-value").textContent = data.temperature ?? "--";
+                    document.getElementById("humidity-value").textContent = data.humidity ?? "--";
+                    document.getElementById("dust-value").textContent = data.dust_density ?? "--";
+                    document.getElementById("gas-value").textContent = data.gas_density ?? "--";
+                    console.log("Detail data fetched successfully:", data);
+                } catch (err) {
+                    console.error("Failed to fetch detail data:", err);
+                }
+
+                detailContent.style.display = "block";
+                detailToggle.querySelector(".arrow").innerHTML = "&#9650;"; // up arrow
+            }
+        });
         // Keep latest interval so other pages (like scheduler) can use it
         let latestInterval = { value: 5, unit: 'min' };
 
@@ -105,25 +139,12 @@
             console.log(`Fetching data every ${value} ${unit}`);
 
             // Initial fetch
-            fetchChartData();
             updateStatusCircle();
 
             // Repeated fetch
             setInterval(() => {
-                fetchChartData();
                 updateStatusCircle();
             }, intervalMs);
-        }
-
-        async function fetchChartData() {
-            try {
-                const res = await fetch('/chart-data');
-                const data = await res.json();
-                console.log('Latest chart data:', data);
-                // TODO: update your chart here
-            } catch (err) {
-                console.error('Failed to fetch chart data:', err);
-            }
         }
 
         // Clock updates
