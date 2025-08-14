@@ -192,35 +192,18 @@ app.post('/data', async (req, res) => {
             level
         });
         console.log('Data received:', { time, temp, hum, gas, dust, level });
-        clients.forEach(c => 
+        clients.forEach(c =>
             c.write(`event: data-ready\ndata: ${JSON.stringify({
-            time: time,
-            temperature: temp,
-            humidity: hum,
-            dust_density: dust,
-            gas_density: gas,
-            level
-        })}\n\n`)
+                time: time,
+                temperature: temp,
+                humidity: hum,
+                dust_density: dust,
+                gas_density: gas,
+                level
+            })}\n\n`)
         );
 
         res.json({ status: "Data received" });
-
-        // if (level > 0) {
-        //     const email = db.collection_name.find(
-        //         { _id:  req.session.user.id },
-        //         { email: 1, _id: 0 }
-        //     );
-
-        //     const res = await fetch('/send-email', {
-        //         method: "POST",
-        //         headers: { "Content-Type": "application/json" },
-        //         body: JSON.stringify({
-        //             to: email,
-        //             subject: "Greeting from SafeSense360",
-        //             text: "Welcome to SafeSense360 – Breathe Safe, Live Well!\n\nAt SafeSense360, we’re committed to safeguarding your health by delivering precise, real-time air quality insights. Our advanced monitoring solutions empower you to make informed decisions, ensuring a cleaner, safer environment for you and your loved ones.\nThank you for trusting us to protect what matters most—your well-being. Explore our innovative technology and take the first step toward healthier air today!\n\nStay informed. Stay protected. SafeSense360."
-        //         })
-        //     });
-        // } 
     } catch (err) {
         console.error(err);
         res.status(500).send('Server error');
@@ -248,6 +231,22 @@ app.get('/get-instant-data', (req, res) => {
     res.json({ status: "Request sent to ESP32" });
 });
 
+// Change silent mode handler
+app.get('/change-silent-mode', (req, res) => {
+    console.log('Received change silent mode request');
+    esp32Task = "change-silent-mode";
+    res.json({ status: "Request sent to ESP32" });
+});
+
+// Test alert handler
+app.get('/test-alert', (req, res) => {
+    console.log('Received test alert request');
+    esp32Task = "test-alert";
+    res.json({ status: "Request sent to ESP32" });
+});
+
+
+
 // esp32 detects for tasks from web server
 app.get('/check-task', (req, res) => {
     console.log('ESP32 checking for tasks, current task:', esp32Task);
@@ -257,9 +256,6 @@ app.get('/check-task', (req, res) => {
     } else {
         res.json({ task: "none" });
     }
-});
-app.listen(PORT, () => {
-    console.log(`Running on port ${PORT}`);
 });
 
 // Logout handler
@@ -296,7 +292,6 @@ app.post('/set-interval', express.json(), (req, res) => {
 app.get('/latest-data', async (req, res) => {
     try {
         const latest = await Environment.findOne().sort({ time: -1 }).exec();
-        // console.log(latest);
         res.json(latest);
     } catch (err) {
         console.error(err);

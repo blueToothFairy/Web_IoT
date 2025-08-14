@@ -175,7 +175,7 @@ body {
 }
 
 .switch input:checked+.slider {
-    background-color: #a00;
+    background-color: green;
 }
 
 .switch input:checked+.slider:before {
