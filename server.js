@@ -7,7 +7,17 @@ const nodemailer = require('nodemailer');
 const cors = require('cors');
 
 const PORT = process.env.PORT || 3000;
-let esp32Task = null; // store command for esp32
+let esp32Task = {
+    "send-data": 0,
+    "change-silent-mode": 0,
+    "test-alert": 0,
+    "led-on": 0
+};// store command for esp32
+
+// utils function
+const { requestInstantData, warningEmail, webServerIP, webServerPORT } = require('./public/js/utils');
+
+
 let clients = [];     // store SSE connections
 const app = express();
 
@@ -172,7 +182,7 @@ app.post('/send-email', async (req, res) => {
 
 // Data-sending from ESP32
 app.post('/data', async (req, res) => {
-    let { time, temp, hum, gas, dust, level } = req.body;
+    let { time, temp, hum, gas, dust, level, lvTemp, lvHumL, lvGas, lvDust, emailUser } = req.body;
 
     if (typeof time === 'string' && /^\d{2}:\d{2}:\d{2}$/.test(time)) {
         const today = new Date();
@@ -191,7 +201,17 @@ app.post('/data', async (req, res) => {
             gas_density: gas,
             level
         });
-        console.log('Data received:', { time, temp, hum, gas, dust, level });
+        console.log('Data received:', { time, temp, hum, gas, dust, level, lvTemp, lvHumL, lvGas, lvDust, emailUser });
+
+        if (level > 0) {
+            // send warning email
+            console.log("Sending warning email...")
+            warningEmail(lvTemp, lvHumL, lvGas, lvDust, emailUser);
+
+            // turn led on
+            esp32Task["led-on"] =level;
+        } 
+
         clients.forEach(c =>
             c.write(`event: data-ready\ndata: ${JSON.stringify({
                 time: time,
@@ -227,34 +247,33 @@ app.get('/events', (req, res) => {
 // Get instant data handler
 app.get('/get-instant-data', (req, res) => {
     console.log('Received instant data request');
-    esp32Task = "send-data";
+    esp32Task["send-data"] = 1;
     res.json({ status: "Request sent to ESP32" });
 });
 
-// Change silent mode handler
+// API: Change silent mode
 app.get('/change-silent-mode', (req, res) => {
     console.log('Received change silent mode request');
-    esp32Task = "change-silent-mode";
+    esp32Task["change-silent-mode"] = 1;
     res.json({ status: "Request sent to ESP32" });
 });
 
-// Test alert handler
+// API: Test alert
 app.get('/test-alert', (req, res) => {
     console.log('Received test alert request');
-    esp32Task = "test-alert";
+    esp32Task["test-alert"] = 1;
     res.json({ status: "Request sent to ESP32" });
 });
 
-
-
-// esp32 detects for tasks from web server
+// API: ESP32 polling check-task
 app.get('/check-task', (req, res) => {
-    console.log('ESP32 checking for tasks, current task:', esp32Task);
-    if (esp32Task) {
-        res.json({ task: esp32Task });
-        esp32Task = null;
-    } else {
-        res.json({ task: "none" });
+    console.log('ESP32 checking for tasks, current tasks:', esp32Task);
+    const tasksToSend = { ...esp32Task };
+    res.json(tasksToSend);
+    for (let key in esp32Task) {
+        if (esp32Task[key] === 1) {
+            esp32Task[key] = 0;
+        }
     }
 });
 
@@ -304,3 +323,6 @@ app.get('/latest-data', async (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Running on port ${PORT}`);
 });
+
+setInterval(requestInstantData, 15000);
+requestInstantData();

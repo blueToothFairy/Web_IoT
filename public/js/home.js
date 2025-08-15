@@ -1,4 +1,4 @@
-const webServerIP = "192.168.56.67";
+const webServerIP = "192.168.1.4";
 const webServerPORT = "3000"
 
 const evtSource = new EventSource(`http://${webServerIP}:${webServerPORT}/events`);
@@ -18,11 +18,12 @@ function changeSilentMode() {
 }
 
 function testAlert() {
+    console.log('Testing alert...');
     fetch(`http://${webServerIP}:${webServerPORT}/test-alert`);
 }
 
-setInterval(requestInstantData, 15000);
-requestInstantData();
+// setInterval(requestInstantData, 15000);
+// requestInstantData();
 // Silent Mode
 const silentModeToggle = document.getElementById("silent-mode-toggle");
 silentModeToggle.addEventListener("change", (event) => {
