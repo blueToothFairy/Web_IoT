@@ -6,7 +6,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
 
-static Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire);
+static Adafruit_SH1106G display(128, 64, &Wire);
 static uint8_t oledAddress = 0x3C;
 
 inline void OLED_I2C_Begin() {

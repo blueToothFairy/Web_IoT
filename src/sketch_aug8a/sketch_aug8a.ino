@@ -4,7 +4,6 @@
 #include "display_oled.h"
 #include "buzzer.h"
 #include "wifi_ntp_http.h"
-#include "adafruit_io.h"
 
 void setup() {
   Serial.begin(115200);
@@ -14,6 +13,11 @@ void setup() {
   pinMode(BUZZER, OUTPUT);
   pinMode(G3_PIN, OUTPUT);        // LED IR GP2Y1010
   digitalWrite(G3_PIN, HIGH);     // tắt LED bụi ban đầu
+
+  //LED
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
+  pinMode(YELLOW_LED, OUTPUT);
 
   // I2C + OLED
   OLED_I2C_Begin();
@@ -31,8 +35,6 @@ void setup() {
 
   // HTTP server
   HTTP_Begin();
-
-  AIO_Begin();
 
   Serial.println("✅ He thong san sang (gio thuc).");
 }
@@ -59,7 +61,5 @@ void loop() {
     // OLED + thời gian hiện tại
     String tstr = Now_String();
     OLED_Render(tstr, st);
-
-    AIO_Tick();
   }
 }

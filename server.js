@@ -11,7 +11,11 @@ let esp32Task = {
     "send-data": 0,
     "change-silent-mode": 0,
     "test-alert": 0,
-    "led-on": 0
+    "led-on": 0,
+    "humidity": 0,
+    "temperature": 0,
+    "gas": 0,
+    "dust": 0
 };// store command for esp32
 
 // utils function
@@ -272,7 +276,7 @@ app.get('/check-task', (req, res) => {
     const tasksToSend = { ...esp32Task };
     res.json(tasksToSend);
     for (let key in esp32Task) {
-        if (esp32Task[key] === 1) {
+        if (esp32Task[key] > 1) {
             esp32Task[key] = 0;
         }
     }
@@ -325,6 +329,10 @@ app.get('/thresholds', (req, res) => {
 // Update thresholds
 app.post('/thresholds', (req, res) => {
     thresholds = { ...thresholds, ...req.body };
+    esp32Task["humidity"] = thresholds.humidity; // update esp32 humidity threshold
+    esp32Task["temperature"] = thresholds.temperature; // update esp32 temperature threshold
+    esp32Task["gas"] = thresholds.gas; // update esp32 gas threshold
+    esp32Task["dust"] = thresholds.dust; // update esp32 dust threshold
     res.sendStatus(200);
 });
 

@@ -1,5 +1,3 @@
-const webServerIP = "192.168.1.4";
-const webServerPORT = "3000"
 
 const evtSource = new EventSource(`http://${webServerIP}:${webServerPORT}/events`);
 console.log(`http://${webServerIP}:${webServerPORT}/events`);

@@ -85,6 +85,34 @@ inline void checkForTasks(String payload) {
               Serial.println("Found test-alert task, executing...");
               tone(BUZZER, 5000); delay(120); noTone(BUZZER); delay(120);
           }
+          if (doc["led-on"] == 1) {
+            digitalWrite(GREEN_LED, LOW);
+            digitalWrite(YELLOW_LED, HIGH);
+            digitalWrite(RED_LED, LOW);
+          } else if (doc["led-on"] == 2) {
+            digitalWrite(GREEN_LED, LOW);
+            digitalWrite(YELLOW_LED, LOW);
+            digitalWrite(RED_LED, HIGH);
+          } else if (doc["led-on"] == 0) {
+            digitalWrite(GREEN_LED, HIGH);
+            digitalWrite(YELLOW_LED, LOW);
+            digitalWrite(RED_LED, LOW);
+          }
+          if (doc["humidity"] > 0 || doc["temperature"] > 0 || doc["gas"] > 0 || doc["dust"] > 0) {
+              Serial.println("Found change-threshold task, executing...");
+              TEMP_WARN = doc["temperature"].as<float>() * 0.9;
+              TEMP_DANG = doc["temperature"].as<float>() * 1.1;
+
+              HUM_LOW  = doc["humidity"].as<float>() * 0.9;
+              HUM_HIGH = doc["humidity"].as<float>() * 1.1;
+
+              MQ2_WARN = doc["gas"].as<float>() * 0.9;
+              MQ2_DANG = doc["gas"].as<float>() * 1.1;
+
+              DUST_WARN = doc["dust"].as<float>() * 0.9;
+              DUST_DANG = doc["dust"].as<float>() * 1.1;
+          }
+
       } else {
           Serial.println("Failed to parse JSON tasks");
       }
@@ -108,6 +136,7 @@ inline void Sensors_Update1Hz() {
   }
   emaGas  = (emaGas==0)  ? mq2Raw  : EMA_ALPHA*mq2Raw  + (1-EMA_ALPHA)*emaGas;
   emaDust = (emaDust==0) ? dustRaw : EMA_ALPHA*dustRaw + (1-EMA_ALPHA)*emaDust;
+
 
   // ===== CLASSIFY =====
   Level lvTemp = prevTemp, lvHumL = prevHum;

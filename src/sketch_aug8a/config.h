@@ -4,14 +4,18 @@
 #include <Arduino.h>
 
 // -------------------- PINOUT / HARDWARE --------------------
-#define DHTPIN         15
+#define DHTPIN         4
 #define DHTTYPE        11          // DHT11
-#define BUZZER         13
-#define MQ2_PIN        34
+#define BUZZER         17
+#define MQ2_PIN        39
+
+#define GREEN_LED      23      
+#define RED_LED        18
+#define YELLOW_LED     19
 
 // Dust sensor GP2Y1010:
-#define G3_PIN         23          // LED IR control
-#define G5_PIN         35          // Vo analog (ADC1)
+#define G3_PIN         16          // LED IR control
+#define G5_PIN         36          // Vo analog (ADC1)
 
 // I2C pins for ESP32
 #define I2C_SDA        21
@@ -41,14 +45,14 @@ static const long  GMT_OFFSET_SEC      = 7 * 3600;
 static const int   DAYLIGHT_OFFSET_SEC = 0;
 
 // -------------------- SAFE THRESHOLDS (nhạy hơn) --------------------
-static const float TEMP_WARN  = 33.0;   // °C
-static const float TEMP_DANG  = 36.0;   // °C
-static const float HUM_LOW    = 35.0;   // %
-static const float HUM_HIGH   = 80.0;   // %
-static const int   MQ2_WARN   = 600;    // ADC
-static const int   MQ2_DANG   = 1000;   // ADC
-static const float   DUST_WARN  = 0.036;    // mg/m3 
-static const float   DUST_DANG  = 0.056;   // mg/m3 
+float TEMP_WARN  = 33.0;   // °C
+float TEMP_DANG  = 36.0;   // °C
+float HUM_LOW    = 35.0;   // %
+float HUM_HIGH   = 80.0;   // %
+int   MQ2_WARN   = 600;    // ADC
+int   MQ2_DANG   = 1000;   // ADC
+float   DUST_WARN  = 0.036;    // mg/m3 
+float   DUST_DANG  = 0.056;   // mg/m3 
 
 // Hysteresis
 static const float TEMP_HYS   = 0.8f;
