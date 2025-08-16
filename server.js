@@ -245,7 +245,12 @@ app.get('/test-alert', (req, res) => {
     res.json({ status: "Request sent to ESP32" });
 });
 
-
+// Change Led handler
+app.get('/change-led-sign', (req, res) => {
+    console.log('Received change LED sign request');
+    esp32Task = "change-led-sign";
+    res.json({ status: "Request sent to ESP32" });
+});
 
 // esp32 detects for tasks from web server
 app.get('/check-task', (req, res) => {
@@ -287,6 +292,25 @@ app.post('/set-interval', express.json(), (req, res) => {
     const { value, unit } = req.body;
     intervalConfig = { value, unit };
     res.json({ success: true });
+});
+
+// threshold config
+let thresholds = {
+    gas: 800,
+    dust: 100,
+    temperature: 32,
+    humidity: 70
+};
+
+// Get current thresholds
+app.get('/thresholds', (req, res) => {
+    res.json(thresholds);
+});
+
+// Update thresholds
+app.post('/thresholds', (req, res) => {
+    thresholds = { ...thresholds, ...req.body };
+    res.sendStatus(200);
 });
 
 app.get('/latest-data', async (req, res) => {

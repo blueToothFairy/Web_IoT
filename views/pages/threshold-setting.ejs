@@ -34,6 +34,33 @@
             </div>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load thresholds from server
+            fetch('/thresholds')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('gas').value = data.gas;
+                    document.getElementById('dust').value = data.dust;
+                    document.getElementById('temperature').value = data.temperature;
+                    document.getElementById('humidity').value = data.humidity;
+                });
+
+            // Save thresholds when input changes
+            document.querySelectorAll('.input input').forEach(input => {
+                input.addEventListener('change', () => {
+                    const payload = {
+                        [input.id]: Number(input.value)
+                    };
+                    fetch('/thresholds', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                });
+            });
+        });
+    </script>
 </body>
 
 </html>
