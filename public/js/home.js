@@ -10,16 +10,6 @@ evtSource.addEventListener('data-ready', function (event) {
 
 });
 
-function changeLedSign(state) {
-    fetch(`http://${webServerIP}:${webServerPORT}/change-led-sign`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ state })
-    });
-}
-
 function requestInstantData() {
     fetch(`http://${webServerIP}:${webServerPORT}/get-instant-data`);
 }

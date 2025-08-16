@@ -265,13 +265,6 @@ app.get('/test-alert', (req, res) => {
     res.json({ status: "Request sent to ESP32" });
 });
 
-// Change Led handler
-app.get('/change-led-sign', (req, res) => {
-    console.log('Received change LED sign request');
-    esp32Task = "change-led-sign";
-    res.json({ status: "Request sent to ESP32" });
-});
-
 // esp32 detects for tasks from web server
 // API: ESP32 polling check-task
 app.get('/check-task', (req, res) => {
@@ -344,8 +337,6 @@ app.get('/latest-data', async (req, res) => {
         res.status(500).send('Server error');
     }
 });
-
-
 
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Running on port ${PORT}`);
