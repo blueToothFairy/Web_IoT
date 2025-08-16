@@ -12,7 +12,7 @@
 static WebServer server(80);
 // ---------- NTP ----------
 inline void NTP_Ensure() {
-  for (size_t i = 0; i < 4; i++) {
+  for (size_t i = 0; i < 10; i++) {
     const char* svr = NTP_SERVERS[i];
     Serial.print("Dong bo NTP: ");
     Serial.println(svr);
@@ -30,7 +30,6 @@ inline void NTP_Ensure() {
     Serial.println("\n⚠️ Thu server khac...");
   }
   Serial.println("⛔ Khong dong bo duoc NTP.");
-  while (true) delay(1000);
 }
 
 inline String Now_String() {

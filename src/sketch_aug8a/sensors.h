@@ -5,6 +5,7 @@
 #include "levels.h"
 #include <DHT.h>
 #include <HTTPClient.h>
+#include <ArduinoJson.h>
 
 static DHT dht(DHTPIN, DHTTYPE);
 
@@ -19,7 +20,7 @@ static Level prevTemp = LV_OK, prevHum = LV_OK, prevGas = LV_OK, prevDust = LV_O
 static EnvState g_state = {NAN, NAN, 0, 0, 0};
 
 // Web server IP
-static String webServerIP = "192.168.56.67";
+static String webServerIP = "192.168.1.4";
 
 // ---- Dust raw read (y nguyên) ----
 inline float Dust_ReadDensity() {
@@ -32,6 +33,8 @@ inline float Dust_ReadDensity() {
   float vOut = v * 3.3 / 4095.0;
   return (0.17 * vOut - 0.1 < 0) ? 0 : (0.17 * vOut - 0.1);
 }
+// BUZZER state
+bool isSilentMode = false;
 
 inline void Sensors_Init() {
   dht.begin();
@@ -65,9 +68,25 @@ inline void checkForTasks(String payload) {
   if (httpCode == 200) {
       String msg = client.getString();
       Serial.println("Task message: " + msg);
-      if (msg.indexOf("send-data") != -1) {
-        Serial.println("Found send-data task, sending...");
-        sendData(payload);
+
+      // Parse JSON
+      StaticJsonDocument<200> doc;
+      DeserializationError error = deserializeJson(doc, msg);
+      if (!error) {
+          if (doc["send-data"] == 1) {
+              Serial.println("Found send-data task, sending...");
+              sendData(payload);
+          }
+          if (doc["change-silent-mode"] == 1) {
+              Serial.println("Found change-silent-mode task, executing...");
+              isSilentMode = !isSilentMode;
+          }
+          if (doc["test-alert"] == 1) {
+              Serial.println("Found test-alert task, executing...");
+              tone(BUZZER, 5000); delay(120); noTone(BUZZER); delay(120);
+          }
+      } else {
+          Serial.println("Failed to parse JSON tasks");
       }
   }
   client.end();
@@ -128,11 +147,17 @@ inline void Sensors_Update1Hz() {
   extern String Now_String();   // khai báo trước, thực thi ở wifi_ntp_http.h
   String tstr = Now_String();
   String payload = "{\"time\":\"" + tstr + "\","
-                   "\"temp\":" + (dht_ok ? String(emaTemp,1) : "null") + ","
-                   "\"hum\":"  + (dht_ok ? String(emaHum,1)  : "null") + ","
-                   "\"gas\":"  + String((int)emaGas) + ","
-                   "\"dust\":" + String(emaDust,1) + ","
-                   "\"level\":" + String((int)lvAll) + "}";
+                 "\"temp\":" + (dht_ok ? String(emaTemp,1) : "null") + ","
+                 "\"hum\":"  + (dht_ok ? String(emaHum,1)  : "null") + ","
+                 "\"gas\":"  + String((int)emaGas) + ","
+                 "\"dust\":" + String(emaDust,1) + ","
+                 "\"level\":" + String((int)lvAll) + ","
+                 "\"lvTemp\":" + String((int)lvTemp) + ","
+                 "\"lvHumL\":" + String((int)lvHumL) + ","
+                 "\"lvGas\":" + String((int)lvGas) + ","
+                 "\"lvDust\":" + String((int)lvDust) + ","
+                 "\"emailUser\":\"" + emailUser + "\""
+                 "}";
   Serial.println(payload);
 
   if ((int)lvAll == 0) {

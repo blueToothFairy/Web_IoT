@@ -1,3 +1,6 @@
+const webServerIP = "192.168.1.4";
+const webServerPORT = "3000"
+
 document.getElementById('register-form').addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = document.getElementById('email').value;

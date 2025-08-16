@@ -41,14 +41,14 @@ static const long  GMT_OFFSET_SEC      = 7 * 3600;
 static const int   DAYLIGHT_OFFSET_SEC = 0;
 
 // -------------------- SAFE THRESHOLDS (nhạy hơn) --------------------
-static const float TEMP_WARN  = 36.0;   // °C
-static const float TEMP_DANG  = 38.0;   // °C
+static const float TEMP_WARN  = 33.0;   // °C
+static const float TEMP_DANG  = 36.0;   // °C
 static const float HUM_LOW    = 35.0;   // %
 static const float HUM_HIGH   = 80.0;   // %
 static const int   MQ2_WARN   = 600;    // ADC
 static const int   MQ2_DANG   = 1000;   // ADC
-static const float   DUST_WARN  = 0.036;    // ADC
-static const float   DUST_DANG  = 0.056;   // ADC
+static const float   DUST_WARN  = 0.036;    // mg/m3 
+static const float   DUST_DANG  = 0.056;   // mg/m3 
 
 // Hysteresis
 static const float TEMP_HYS   = 0.8f;
@@ -62,6 +62,9 @@ static const float EMA_ALPHA  = 0.3f;
 // Nhịp cập nhật
 static const uint32_t UPDATE_MS = 1000;
 
+// User's email
+static const String emailUser = "pqthinh231@clc.fitus.edu.vn";
+
 // -------------------- Types --------------------
 enum Level { LV_OK=0, LV_WARN=1, LV_DANG=2 };
 
@@ -73,5 +76,8 @@ struct EnvState {
   float   dust;       // EMA float
   int   level;      // 0/1/2
 };
+
+// BUZZER STATE
+extern bool isSilentMode;
 
 #endif
