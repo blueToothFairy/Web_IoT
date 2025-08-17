@@ -162,14 +162,14 @@ app.post('/send-email', async (req, res) => {
     const deliver = nodemailer.createTransport({
         service: 'gmail',
         auth: {
-            user: 'thinhpham2310@gmail.com',
-            pass: 'yzaz atae hzvm yymn',
+            user: 'sakurahanna896@gmail.com',
+            pass: 'ivpx kspu wrzo kmya', // yzaz atae hzvm yymn
         },
         tls: { rejectUnauthorized: false },
     });
 
     const mailDetails = {
-        from: 'thinhpham2310@gmail.com',
+        from: 'sakurahanna896@gmail.com',
         to,
         subject,
         text,

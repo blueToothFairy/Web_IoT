@@ -245,89 +245,6 @@ inline void startConfigMode() {
   NTP_Ensure();
 }
 
-// Chế độ bình thường
-inline void setupNormalServer() {
-  server.on("/", []() {
-    String html = "<html><head><title>ESP32 WiFi</title></head><body>";
-    html += "<h2>Connected to WiFi!</h2>";
-    html += "<p><b>Wifi:</b> " + WiFi.SSID() + "</p>";
-    html += "<p><b>IP:</b> " + WiFi.localIP().toString() + "</p>";
-    html += "<p><b>dBm:</b> " + String(WiFi.RSSI()) + " dBm</p>";
-    html += "<br><a href='/config'><button>Switch Wifi</button></a>";
-    html += "</body></html>";
-    server.send(200, "text/html", html);
-  });
-
-  // Trang cấu hình (có thể truy cập khi đã kết nối)
-  server.on("/config", []() {
-    String html = "<!DOCTYPE html><html><head>";
-    html += "<title>WiFi Config</title>";
-    html += "<meta charset='UTF-8'>";
-    html += "<style>";
-    html += "body{font-family:Arial;max-width:400px;margin:50px auto;padding:20px;}";
-    html += "input,button{width:100%;padding:10px;margin:10px 0;font-size:16px;}";
-    html += "button{background:#4CAF50;color:white;border:none;cursor:pointer;}";
-    html += ".network{background:#f0f0f0;padding:10px;margin:5px 0;cursor:pointer;}";
-    html += "</style></head><body>";
-    html += "<h2>WiFi Configuration</h2>";
-    html += "<button onclick='scanWifi()'>Scan WiFi</button>";
-    html += "<div id='networks'></div>";
-    html += "<form onsubmit='saveWifi(event)'>";
-    html += "<input type='text' id='ssid' placeholder='WiFi' required>";
-    html += "<input type='password' id='password' placeholder='Password'>";
-    html += "<button type='submit'>Connect</button>";
-    html += "</form>";
-    html += "<div id='status'></div>";
-    html += "<script>";
-    html += "function scanWifi(){";
-    html += "document.getElementById('status').innerHTML='Scanning...';";
-    html += "fetch('/scan').then(r=>r.text()).then(data=>{";
-    html += "document.getElementById('networks').innerHTML=data;";
-    html += "document.getElementById('status').innerHTML='';";
-    html += "});}";
-    html += "function selectWifi(ssid){";
-    html += "document.getElementById('ssid').value=ssid;}";
-    html += "function saveWifi(e){";
-    html += "e.preventDefault();";
-    html += "const ssid=document.getElementById('ssid').value;";
-    html += "const pass=document.getElementById('password').value;";
-    html += "document.getElementById('status').innerHTML='...';";
-    html += "fetch('/save',{";
-    html += "method:'POST',";
-    html += "headers:{'Content-Type':'application/x-www-form-urlencoded'},";
-    html += "body:'ssid='+ssid+'&password='+pass";
-    html += "}).then(r=>r.text()).then(data=>{";
-    html += "document.getElementById('status').innerHTML=data;";
-    html += "});}";
-    html += "scanWifi();";
-    html += "</script></body></html>";
-
-    server.send(200, "text/html", html);
-  });
-
-  server.on("/scan", []() {
-    String html = "";
-    int n = WiFi.scanNetworks();
-    for (int i = 0; i < n; i++) {
-      html += "<div class='network' onclick='selectWifi(\"" + WiFi.SSID(i) + "\")'>";
-      html += WiFi.SSID(i) + " (" + String(WiFi.RSSI(i)) + " dBm)";
-      html += "</div>";
-    }
-    server.send(200, "text/html", html);
-  });
-
-  server.on("/save", HTTP_POST, []() {
-    String ssid = server.arg("ssid");
-    String password = server.arg("password");
-    saveWifiConfig(ssid, password);
-    server.send(200, "text/html", "<h3>Restarting...</h3>");
-    delay(2000);
-    ESP.restart();
-  });
-
-  server.begin();
-}
-
 inline bool is_WIFI_Connected() {
   return WiFi.status() == WL_CONNECTED;
 }
@@ -353,7 +270,6 @@ inline void connectWifi() {
     Serial.println("");
     Serial.println("Ket noi thanh cong!");
     Serial.println("IP: " + WiFi.localIP().toString());
-    setupNormalServer();
   } else {
     Serial.println("");
     Serial.println("Ket noi that bai! Chuyen sang che do cau hinh");
