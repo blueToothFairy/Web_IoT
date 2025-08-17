@@ -20,7 +20,7 @@ static Level prevTemp = LV_OK, prevHum = LV_OK, prevGas = LV_OK, prevDust = LV_O
 static EnvState g_state = {NAN, NAN, 0, 0, 0};
 
 // Web server IP
-static String webServerIP = "192.168.1.4";
+static String webServerIP = "192.168.2.12";
 
 // ---- Dust raw read (y nguyên) ----
 inline float Dust_ReadDensity() {
@@ -85,31 +85,36 @@ inline void checkForTasks(String payload) {
               Serial.println("Found test-alert task, executing...");
               tone(BUZZER, 5000); delay(120); noTone(BUZZER); delay(120);
           }
-          if (doc["led-on"] == 1) {
+          if (doc["led-on"].as<int>() == 1) {
+            Serial.println("Yellow LED on");
             digitalWrite(GREEN_LED, LOW);
             digitalWrite(YELLOW_LED, HIGH);
             digitalWrite(RED_LED, LOW);
-          } else if (doc["led-on"] == 2) {
+          }
+          if (doc["led-on"].as<int>() == 2) {
+            Serial.println("Red LED on");
             digitalWrite(GREEN_LED, LOW);
             digitalWrite(YELLOW_LED, LOW);
             digitalWrite(RED_LED, HIGH);
-          } else if (doc["led-on"] == 0) {
+          }
+          if (doc["led-on"].as<int>() == 0) {
+            Serial.println("Green LED on");
             digitalWrite(GREEN_LED, HIGH);
             digitalWrite(YELLOW_LED, LOW);
             digitalWrite(RED_LED, LOW);
           }
           if (doc["humidity"] > 0 || doc["temperature"] > 0 || doc["gas"] > 0 || doc["dust"] > 0) {
               Serial.println("Found change-threshold task, executing...");
-              TEMP_WARN = doc["temperature"].as<float>() * 0.9;
+              TEMP_WARN = doc["temperature"].as<float>();
               TEMP_DANG = doc["temperature"].as<float>() * 1.1;
 
-              HUM_LOW  = doc["humidity"].as<float>() * 0.9;
+              HUM_LOW  = doc["humidity"].as<float>();
               HUM_HIGH = doc["humidity"].as<float>() * 1.1;
 
-              MQ2_WARN = doc["gas"].as<float>() * 0.9;
+              MQ2_WARN = doc["gas"].as<float>();
               MQ2_DANG = doc["gas"].as<float>() * 1.1;
 
-              DUST_WARN = doc["dust"].as<float>() * 0.9;
+              DUST_WARN = doc["dust"].as<float>();
               DUST_DANG = doc["dust"].as<float>() * 1.1;
           }
 
@@ -189,11 +194,11 @@ inline void Sensors_Update1Hz() {
                  "}";
   Serial.println(payload);
 
-  if ((int)lvAll == 0) {
-    checkForTasks(payload);
-  } else {
+  if ((int)lvAll > 0) {
     sendData(payload);
   }
+
+  checkForTasks(payload);
 }
 
 #endif

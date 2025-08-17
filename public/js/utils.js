@@ -1,4 +1,4 @@
-const webServerIP = "172.21.80.1";
+const webServerIP = "192.168.2.12";
 const webServerPORT = "3000"
 
 function requestInstantData() {
