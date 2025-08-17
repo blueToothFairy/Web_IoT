@@ -332,7 +332,7 @@ async def reply_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     txt = (update.message.text or "").lower().strip()
 
-    if any(k in txt for k in ["đánh giá", "evaluate", "assessment"]):
+    if any(k in txt for k in ["đánh giá", "evaluate", "assessment", "phân tích"]):
         ctx_text = ""
         async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT) as s:
             try:
@@ -351,6 +351,7 @@ async def reply_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Thông tin mới nhất: {ctx_text}\n"
             "Hãy đánh giá dựa trên nhiệt độ, độ ẩm, và các thông số liên quan khác.\n"
             "Nếu có rủi ro thì nêu rõ nguyên nhân và khuyến nghị."
+            "Trả lời cực chi tiết cho tôi."
         )
 
         async with aiohttp.ClientSession(timeout=AI_TIMEOUT) as s:
