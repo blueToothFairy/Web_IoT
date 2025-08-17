@@ -208,12 +208,14 @@ app.post('/data', async (req, res) => {
         console.log('Data received:', { time, temp, hum, gas, dust, level, lvTemp, lvHumL, lvGas, lvDust, emailUser });
 
         if (level > 0) {
+            // turn led on
+            esp32Task["led-on"] = level;
+
             // send warning email
             console.log("Sending warning email...")
             warningEmail(lvTemp, lvHumL, lvGas, lvDust, emailUser);
-
-            // turn led on
-            esp32Task["led-on"] = level;
+        } else {
+            esp32Task["led-on"] = 0;
         }
 
         clients.forEach(c =>
@@ -276,7 +278,7 @@ app.get('/check-task', (req, res) => {
     const tasksToSend = { ...esp32Task };
     res.json(tasksToSend);
     for (let key in esp32Task) {
-        if (esp32Task[key] > 1) {
+        if (esp32Task[key] > 0) {
             esp32Task[key] = 0;
         }
     }
